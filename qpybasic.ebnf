@@ -1,0 +1,49 @@
+%import common.WS
+%ignore WS
+
+start: program
+
+program: (line NEWLINE)* line NEWLINE?
+
+line: [label | lineno] stmt?
+
+label: ID ":"
+
+lineno: INT_LITERAL
+
+stmt: end_stmt
+    | let_stmt
+    | print_stmt
+
+end_stmt: END_KW
+
+let_stmt: LET_KW? ID "=" expr
+
+print_stmt: PRINT_KW (expr (SEMICOLON | COMMA))* [expr [SEMICOLON | COMMA]]
+
+expr: mult_expr
+    | expr "+" mult_expr  -> expr_add
+    | expr "-" mult_expr  -> expr_sub
+
+mult_expr: unary_expr
+         | mult_expr "*" unary_expr  -> expr_mult
+         | mult_expr "/" unary_expr  -> expr_div
+
+unary_expr: int_value
+          | "-" expr      -> negation
+          | "(" expr ")"
+
+int_value: INT_LITERAL
+         | var
+
+var: ID
+
+NEWLINE: "\n"
+SEMICOLON: ";"
+COMMA: ","
+ID: /[a-z_][a-z0-9]*/i
+INT_LITERAL: /\d+/
+
+END_KW: "end"i
+LET_KW: "let"i
+PRINT_KW: "print"i
