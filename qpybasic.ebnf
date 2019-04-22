@@ -11,9 +11,12 @@ label: ID ":"
 
 lineno: INT_LITERAL
 
-stmt: end_stmt
+stmt: cls_stmt
+    | end_stmt
     | let_stmt
     | print_stmt
+
+cls_stmt: CLS_KW
 
 end_stmt: END_KW
 
@@ -46,6 +49,7 @@ ID: /[a-z_][a-z0-9]*/i
 INT_LITERAL: /\d+/
 STRING_LITERAL: /"[^"]*"/
 
+CLS_KW: "cls"i
 END_KW: "end"i
 LET_KW: "let"i
 PRINT_KW: "print"i

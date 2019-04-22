@@ -14,6 +14,12 @@ class MyT(Transformer):
     def stmt(self, items):
         return items[0]
 
+    def cls_stmt(self, items):
+        seq =  '\033[2J'    # clear screen
+        seq += '\033[1;1H'  # move cursor to screen top-left
+        print(seq)
+        return items
+
     def end_stmt(self, items):
         print('END!')
 
@@ -132,6 +138,7 @@ z = "foo"
 z2 = "bar"
 foo = z + z2
 
+cls
 print
 print x; y; -(x + y*2), foo
 print 1, 2, z
