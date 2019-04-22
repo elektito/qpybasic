@@ -28,7 +28,10 @@ class MyT(Transformer):
     def print_stmt(self, items):
         items = items[1:]
         if not items:
-            print()
+            line = '\n'
+        else:
+            line = ''
+
         while items:
             i, items = items[0], items[1:]
             if type(i) == int:
@@ -42,20 +45,18 @@ class MyT(Transformer):
             if items:
                 sep, items = items[0], items[1:]
             else:
-                sep = '\n'
+                sep = None
 
+            line += p
             if sep == ';':
                 pass
-            elif sep == '\n':
-                p += sep
             elif sep == ',':
-                if len(p) % 14 != 0:
-                    n = (len(p) // 14 + 1) * 14 - len(p)
-                else:
-                    n = 0
-                p += n * ' '
+                n = 14 - (len(line) % 14)
+                line += n * ' '
+            else:
+                line += '\n'
 
-            print(p, end='')
+        print(line, end='')
 
 
     def expr(self, items):
