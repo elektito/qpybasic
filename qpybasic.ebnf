@@ -29,12 +29,13 @@ mult_expr: unary_expr
          | mult_expr "*" unary_expr  -> expr_mult
          | mult_expr "/" unary_expr  -> expr_div
 
-unary_expr: int_value
+unary_expr: value
           | "-" expr      -> negation
           | "(" expr ")"
 
-int_value: INT_LITERAL
-         | var
+value: INT_LITERAL
+     | STRING_LITERAL
+     | var
 
 var: ID
 
@@ -43,6 +44,7 @@ SEMICOLON: ";"
 COMMA: ","
 ID: /[a-z_][a-z0-9]*/i
 INT_LITERAL: /\d+/
+STRING_LITERAL: /"[^"]*"/
 
 END_KW: "end"i
 LET_KW: "let"i

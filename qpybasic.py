@@ -21,7 +21,7 @@ class MyT(Transformer):
         if len(items) == 3:
             items = items[1:]
         var, value = items
-        print(":: setting {} to {}".format(var, value))
+        print(":: setting {} to {} ({})".format(var, value, type(value).__name__))
         self.variables[var.value] = value
         return 'let {} = {}'.format(var, value)
 
@@ -31,10 +31,13 @@ class MyT(Transformer):
             print()
         while items:
             i, items = items[0], items[1:]
-            if i < 0:
-                p = '{} '.format(i)
+            if type(i) == int:
+                if i < 0:
+                    p = '{} '.format(i)
+                else:
+                    p = ' {} '.format(i)
             else:
-                p = ' {} '.format(i)
+                p = i
 
             if items:
                 sep, items = items[0], items[1:]
@@ -60,42 +63,62 @@ class MyT(Transformer):
 
     def expr_add(self, items):
         x, y = items
-        return x + y
+        if type(x) == int and type(y) == int:
+            return x + y
+        elif type(x) == str and type(y) == str:
+            return x + y
+        else:
+            raise RuntimeError('Type mismatch.')
 
     def expr_sub(self, items):
         x, y = items
-        return x - y
+        if type(x) == int and type(y) == int:
+            return x - y
+        else:
+            raise RuntimeError('Type mismatch.')
 
     def mult_expr(self, items):
         return items[0]
 
     def expr_mult(self, items):
         x, y = items
-        return x * y
+        if type(x) == int and type(y) == int:
+            return x * y
+        else:
+            raise RuntimeError('Type mismatch.')
 
     def expr_div(self, items):
         x, y = items
-        return x // y
+        if type(x) == int and type(y) == int:
+            return x // y
+        else:
+            raise RuntimeError('Type mismatch.')
 
     def unary_expr(self, items):
         return items[0]
 
-    def int_value(self, items):
+    def value(self, items):
         item, = items
-        if isinstance(item, int):
+        if type(item) in [int, str]:
             return item
-        else:
+        elif item.type == 'INT_LITERAL':
             return int(item.value)
+        elif item.type == 'STRING_LITERAL':
+            return item.value[1:-1]
 
     def var(self, items):
         varname = items[0].value
         if varname in self.variables:
             return self.variables[varname]
         else:
-            raise RuntimeError("Undefined variable: {}".format(varname))
+            raise RuntimeError('Undefined variable: {}'.format(varname))
 
     def negation(self, items):
-        return -items[0]
+        x, = items
+        if type(x) == int:
+            return -items[0]
+        else:
+            raise RuntimeError('Type mismatch.')
 
 with open('qpybasic.ebnf') as f:
     grammar_text = f.read()
@@ -104,9 +127,13 @@ parser = Lark(grammar_text)
 prog = r"""
 x = 100
 let y = 200
+z = "foo"
+z2 = "bar"
+foo = z + z2
 
 print
-print x; y; -(x + y*2)
+print x; y; -(x + y*2), foo
+print 1, 2, z
 end
 """
 x = parser.parse(prog)
