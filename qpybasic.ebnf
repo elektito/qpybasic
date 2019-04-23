@@ -23,9 +23,17 @@ let_stmt: LET_KW? ID "=" expr
 
 print_stmt: PRINT_KW (expr (SEMICOLON | COMMA))* [expr [SEMICOLON | COMMA]]
 
-expr: mult_expr
-    | expr "+" mult_expr  -> expr_add
-    | expr "-" mult_expr  -> expr_sub
+expr: add_expr
+    | expr "<" add_expr   -> expr_lt
+    | expr ">" add_expr   -> expr_gt
+    | expr "<=" add_expr  -> expr_le
+    | expr ">=" add_expr  -> expr_ge
+    | expr "=" add_expr   -> expr_eq
+    | expr "<>" add_expr   -> expr_ne
+
+add_expr: mult_expr
+        | add_expr "+" mult_expr  -> expr_add
+        | add_expr "-" mult_expr  -> expr_sub
 
 mult_expr: unary_expr
          | mult_expr "*" unary_expr  -> expr_mult

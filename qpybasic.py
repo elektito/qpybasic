@@ -80,7 +80,58 @@ class MyC(Transformer):
         return args + [Instr('call', '__print', len(items) - 1)]
 
     def expr(self, items):
-        return items[0]
+        return items
+
+    def expr_lt(self, items):
+        x, y = items
+        if isinstance(x, Instr):
+            x = [x]
+        if isinstance(y, Instr):
+            y = [y]
+        return x + y + [Instr('lt')]
+
+    def expr_gt(self, items):
+        x, y = items
+        if isinstance(x, Instr):
+            x = [x]
+        if isinstance(y, Instr):
+            y = [y]
+        return x + y + [Instr('gt')]
+
+    def expr_le(self, items):
+        x, y = items
+        if isinstance(x, Instr):
+            x = [x]
+        if isinstance(y, Instr):
+            y = [y]
+        return x + y + [Instr('le')]
+
+    def expr_ge(self, items):
+        x, y = items
+        if isinstance(x, Instr):
+            x = [x]
+        if isinstance(y, Instr):
+            y = [y]
+        return x + y + [Instr('ge')]
+
+    def expr_eq(self, items):
+        x, y = items
+        if isinstance(x, Instr):
+            x = [x]
+        if isinstance(y, Instr):
+            y = [y]
+        return x + y + [Instr('eq')]
+
+    def expr_ne(self, items):
+        x, y = items
+        if isinstance(x, Instr):
+            x = [x]
+        if isinstance(y, Instr):
+            y = [y]
+        return x + y + [Instr('ne')]
+
+    def add_expr(self, items):
+        return items
 
     def expr_add(self, items):
         x, y = items
