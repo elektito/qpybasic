@@ -60,6 +60,9 @@ class MyC(Transformer):
     def end_stmt(self, items):
         return Instr('end')
 
+    def goto_stmt(self, items):
+        return Instr('goto', '__' + items[1].value)
+
     def let_stmt(self, items):
         if len(items) == 3:
             items = items[1:]
@@ -203,6 +206,7 @@ xyz: cls
 print
 10 print x; y; -(x + y*2), foo
 print 1, 2, z
+goto 10
 end
 """
 x = parser.parse(prog)
