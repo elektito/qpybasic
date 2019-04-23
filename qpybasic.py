@@ -10,6 +10,13 @@ class Instr(tuple):
     def __str__(self):
         return self[0] + '\t' + ', '.join(str(i) for i in self[1:])
 
+class Label:
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return '{}:'.format(self.value)
+
 def flatten_tree(t):
     ret = []
     for i in t:
@@ -18,6 +25,8 @@ def flatten_tree(t):
         elif isinstance(i, Token) and i.type == 'NEWLINE':
             pass
         elif isinstance(i, Instr):
+            ret.append(i)
+        elif isinstance(i, Label):
             ret.append(i)
         elif i == None:
             pass
@@ -33,9 +42,14 @@ class MyC(Transformer):
     def program(self, items):
         return flatten_tree(items)
 
+    def label(self, items):
+        return Label('__{}'.format(items[0].value))
+
+    def lineno(self, items):
+        return Label('__{}'.format(items[0].value))
+
     def line(self, items):
-        if items:
-            return items[0]
+        return items
 
     def stmt(self, items):
         return items[0]
@@ -127,20 +141,20 @@ with open('qpybasic.ebnf') as f:
 parser = Lark(grammar_text)
 
 prog = r"""
+start:
 x = 100
 let y = 200
 z = "foo"
 z2 = "bar"
 foo = z + z2
 
-cls
+xyz: cls
 print
-print x; y; -(x + y*2), foo
+10 print x; y; -(x + y*2), foo
 print 1, 2, z
 end
 """
 x = parser.parse(prog)
-#y=MyT().transform(x)
 y=MyC().transform(x)
 for x in y:
     print(x)
