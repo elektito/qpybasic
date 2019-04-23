@@ -1,11 +1,37 @@
-from lark import Lark, Transformer
+from lark import Lark, Transformer, Token, Tree
 
-class MyT(Transformer):
-    def __init__(self):
-        self.variables = {}
+class Instr(tuple):
+    def __new__(cls, *args):
+        return super(Instr, cls).__new__(cls, tuple(args))
+
+    def __repr__(self):
+        return '<Instr {}>'.format(super().__repr__())
+
+    def __str__(self):
+        return self[0] + '\t' + ', '.join(str(i) for i in self[1:])
+
+def flatten_tree(t):
+    ret = []
+    for i in t:
+        if isinstance(i, list):
+            ret += flatten_tree(i)
+        elif isinstance(i, Token) and i.type == 'NEWLINE':
+            pass
+        elif isinstance(i, Instr):
+            ret.append(i)
+        elif i == None:
+            pass
+        else:
+            raise RuntimeError('Got something unexpected: {}'.format(repr(i)))
+
+    return ret
+
+class MyC(Transformer):
+    def start(self, items):
+        return items[0]
 
     def program(self, items):
-        return items
+        return flatten_tree(items)
 
     def line(self, items):
         if items:
@@ -15,117 +41,86 @@ class MyT(Transformer):
         return items[0]
 
     def cls_stmt(self, items):
-        seq =  '\033[2J'    # clear screen
-        seq += '\033[1;1H'  # move cursor to screen top-left
-        print(seq)
-        return items
+        return Instr('call', '__cls', 0)
 
     def end_stmt(self, items):
-        print('END!')
+        return Instr('end')
 
     def let_stmt(self, items):
         if len(items) == 3:
             items = items[1:]
-        var, value = items
-        print(":: setting {} to {} ({})".format(var, value, type(value).__name__))
-        self.variables[var.value] = value
-        return 'let {} = {}'.format(var, value)
+        return [items[1],
+                Instr('storel', items[0].value)]
 
     def print_stmt(self, items):
-        items = items[1:]
-        if not items:
-            line = '\n'
-        else:
-            line = ''
-
-        while items:
-            i, items = items[0], items[1:]
-            if type(i) == int:
-                if i < 0:
-                    p = '{} '.format(i)
-                else:
-                    p = ' {} '.format(i)
+        args = []
+        for a in items[1:]:
+            if isinstance(a, Instr):
+                args.append(a)
+            elif isinstance(a, list):
+                args += a
+            elif isinstance(a, Token):
+                args.append(Instr('pushi', '"{}"'.format(a.value)))
             else:
-                p = i
-
-            if items:
-                sep, items = items[0], items[1:]
-            else:
-                sep = None
-
-            line += p
-            if sep == ';':
-                pass
-            elif sep == ',':
-                n = 14 - (len(line) % 14)
-                line += n * ' '
-            else:
-                line += '\n'
-
-        print(line, end='')
-
+                RuntimeError('Something unexpected sent to PRINT.')
+        return args + [Instr('call', '__print', len(items) - 1)]
 
     def expr(self, items):
         return items[0]
 
     def expr_add(self, items):
         x, y = items
-        if type(x) == int and type(y) == int:
-            return x + y
-        elif type(x) == str and type(y) == str:
-            return x + y
-        else:
-            raise RuntimeError('Type mismatch.')
+        if isinstance(x, Instr):
+            x = [x]
+        if isinstance(y, Instr):
+            y = [y]
+        return x + y + [Instr('add')]
 
     def expr_sub(self, items):
         x, y = items
-        if type(x) == int and type(y) == int:
-            return x - y
-        else:
-            raise RuntimeError('Type mismatch.')
+        if isinstance(x, Instr):
+            x = [x]
+        if isinstance(y, Instr):
+            y = [y]
+        return x + y + [Instr('sub')]
 
     def mult_expr(self, items):
         return items[0]
 
     def expr_mult(self, items):
         x, y = items
-        if type(x) == int and type(y) == int:
-            return x * y
-        else:
-            raise RuntimeError('Type mismatch.')
+        if isinstance(x, Instr):
+            x = [x]
+        if isinstance(y, Instr):
+            y = [y]
+        return x + y + [Instr('mul')]
 
     def expr_div(self, items):
         x, y = items
-        if type(x) == int and type(y) == int:
-            return x // y
-        else:
-            raise RuntimeError('Type mismatch.')
+        if isinstance(x, Instr):
+            x = [x]
+        if isinstance(y, Instr):
+            y = [y]
+        return x + y + [Instr('div')]
 
     def unary_expr(self, items):
         return items[0]
 
     def value(self, items):
-        item, = items
-        if type(item) in [int, str]:
-            return item
-        elif item.type == 'INT_LITERAL':
-            return int(item.value)
-        elif item.type == 'STRING_LITERAL':
-            return item.value[1:-1]
+        if isinstance(items[0], Instr):
+            return items[0]
+        elif isinstance(items[0], Token):
+            return Instr('pushi', items[0].value)
 
     def var(self, items):
-        varname = items[0].value
-        if varname in self.variables:
-            return self.variables[varname]
-        else:
-            raise RuntimeError('Undefined variable: {}'.format(varname))
+        return Instr('pushl', items[0].value)
 
     def negation(self, items):
-        x, = items
-        if type(x) == int:
-            return -items[0]
-        else:
-            raise RuntimeError('Type mismatch.')
+        x = items[0]
+        if isinstance(x, Instr):
+            x = [x]
+        return x + [Instr('neg')]
+
 
 with open('qpybasic.ebnf') as f:
     grammar_text = f.read()
@@ -145,4 +140,7 @@ print 1, 2, z
 end
 """
 x = parser.parse(prog)
-y=MyT().transform(x)
+#y=MyT().transform(x)
+y=MyC().transform(x)
+for x in y:
+    print(x)
