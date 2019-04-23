@@ -1,5 +1,4 @@
-%import common.WS
-%ignore WS
+%ignore /[ \t\f]+/
 
 start: program
 
