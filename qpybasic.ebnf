@@ -4,7 +4,9 @@ start: program
 
 program: (line NEWLINE)* line NEWLINE?
 
-line: [label | lineno] stmt?
+line: [label | lineno] stmt_group
+
+stmt_group: (stmt ":")* [stmt ":"?]
 
 label: ID ":"
 

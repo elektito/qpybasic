@@ -54,6 +54,9 @@ class MyC(Transformer):
     def stmt(self, items):
         return items[0]
 
+    def stmt_group(self, items):
+        return sum((i if isinstance(i, list) else [i] for i in items), [])
+
     def cls_stmt(self, items):
         return Instr('call', '__cls', 0)
 
@@ -196,8 +199,7 @@ parser = Lark(grammar_text)
 
 prog = r"""
 start:
-x = 100
-let y = 200
+x = 100:let y = 200
 z = "foo"
 z2 = "bar"
 foo = z + z2
