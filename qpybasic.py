@@ -8,7 +8,7 @@ class Instr(tuple):
         return '<Instr {}>'.format(super().__repr__())
 
     def __str__(self):
-        return self[0] + '\t' + ', '.join(str(i) for i in self[1:])
+        return '\t' + self[0] + '\t' + ', '.join(str(i) for i in self[1:])
 
 class Label:
     def __init__(self, value):
@@ -16,6 +16,14 @@ class Label:
 
     def __str__(self):
         return '{}:'.format(self.value)
+
+labels = {}
+def get_label(prefix):
+    if prefix not in labels:
+        labels[prefix] = 1
+    else:
+        labels[prefix] += 1
+    return '_{}_{}'.format(prefix, labels[prefix])
 
 def flatten_tree(t):
     ret = []
@@ -57,6 +65,59 @@ class MyC(Transformer):
     def stmt_group(self, items):
         return sum((i if isinstance(i, list) else [i] for i in items), [])
 
+    def block(self, items):
+        return sum(items, [])
+
+    def block_body(self, items):
+        if items:
+            return sum(items, [])
+        else:
+            return []
+
+    def block_body_item(self, items):
+        items = items[:-1] # remove final newline
+        return sum(items[0], [])
+
+    def if_block(self, items):
+        # IF, cond, THEN, NEWLINE, then_body, rest, END, IF
+        _, cond, _, _, then_body, rest, _, _ = items
+
+        endif_label = get_label('endif')
+
+        if rest:
+            label, rest = rest
+            rest = [Instr('jmp', endif_label) if r == 'JMP_TO_ENDIF' else r for r in rest]
+            return cond + [Instr('jmpf', label)] + then_body + [Instr('jmp', endif_label), Label(label)] + rest + [Label(endif_label)]
+        else:
+            return cond + [Instr('jmpf', endif_label)] + then_body + [Label(endif_label)]
+
+    def elseif_sub_block(self, items):
+        _, cond, _, _, then_body, rest = items
+
+        else_label = get_label('else')
+
+        if rest:
+            label, rest = rest
+
+            # JMP_TO_ENDIF is a placeholder that will be later
+            # replaced by an actual jmp to the end of the if block.
+            instrs = cond + [Instr('jmpf', label)] + then_body + ['JMP_TO_ENDIF', Label(label)] + rest
+        else:
+            instrs = cond + [Instr('jmpf', endif_label)] + then_body + [Label(endif_label)]
+
+        return else_label, instrs
+
+    def else_sub_block(self, items):
+        _, _, body = items
+        else_label = get_label('else')
+        return else_label, body
+
+    def else_list(self, items):
+        # The important cases are handled by separate functions
+        # (handling aliases). the only remaining case is no "else" at
+        # all.
+        return []
+
     def cls_stmt(self, items):
         return Instr('call', '__cls', 0)
 
@@ -86,7 +147,7 @@ class MyC(Transformer):
         return args + [Instr('call', '__print', len(items) - 1)]
 
     def expr(self, items):
-        return items
+        return sum(items, [])
 
     def expr_lt(self, items):
         x, y = items
@@ -137,7 +198,7 @@ class MyC(Transformer):
         return x + y + [Instr('ne')]
 
     def add_expr(self, items):
-        return items
+        return sum(items, [])
 
     def expr_add(self, items):
         x, y = items
@@ -156,7 +217,7 @@ class MyC(Transformer):
         return x + y + [Instr('sub')]
 
     def mult_expr(self, items):
-        return items[0]
+        return sum(items, [])
 
     def expr_mult(self, items):
         x, y = items
@@ -175,16 +236,16 @@ class MyC(Transformer):
         return x + y + [Instr('div')]
 
     def unary_expr(self, items):
-        return items[0]
+        return sum(items, [])
 
     def value(self, items):
-        if isinstance(items[0], Instr):
-            return items[0]
-        elif isinstance(items[0], Token):
-            return Instr('pushi', items[0].value)
+        if isinstance(items[0], Token):
+            return [Instr('pushi', items[0].value)]
+        else:
+            return sum(items, [])
 
     def var(self, items):
-        return Instr('pushl', items[0].value)
+        return [Instr('pushl', items[0].value)]
 
     def negation(self, items):
         x = items[0]
@@ -195,7 +256,6 @@ class MyC(Transformer):
 
 with open('qpybasic.ebnf') as f:
     grammar_text = f.read()
-parser = Lark(grammar_text)
 
 prog = r"""
 start:
@@ -204,6 +264,12 @@ z = "foo"
 z2 = "bar"
 foo = z + z2
 
+if x < y then
+    print "less"
+else
+    print "more"
+end if
+
 xyz: cls
 print
 10 print x; y; -(x + y*2), foo
@@ -211,6 +277,7 @@ print 1, 2, z
 goto 10
 end
 """
+parser = Lark(grammar_text, propagate_positions=True, start='start')
 x = parser.parse(prog)
 y=MyC().transform(x)
 for x in y:

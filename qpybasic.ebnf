@@ -2,7 +2,9 @@
 
 start: program
 
-program: (line NEWLINE)* line NEWLINE?
+program: ((line | block) NEWLINE)* (line | block) NEWLINE?
+
+block: if_block
 
 line: [label | lineno] stmt_group
 
@@ -17,6 +19,19 @@ stmt: cls_stmt
     | goto_stmt
     | let_stmt
     | print_stmt
+
+if_block: IF_KW expr THEN_KW NEWLINE block_body else_list END_KW IF_KW
+
+else_list: ELSEIF_KW expr THEN_KW NEWLINE block_body else_list  -> elseif_sub_block
+         | ELSE_KW NEWLINE block_body                           -> else_sub_block
+         |
+
+block_body: block_body_item block_body
+          |
+
+block_body_item: block NEWLINE
+               | line NEWLINE
+               | NEWLINE
 
 cls_stmt: CLS_KW
 
@@ -62,7 +77,11 @@ INT_LITERAL: /\d+/
 STRING_LITERAL: /"[^"]*"/
 
 CLS_KW: "cls"i
+ELSE_KW: "else"i
+ELSEIF_KW: "elseif"i
 END_KW: "end"i
 GOTO_KW: "goto"i
+IF_KW: "if"i
 LET_KW: "let"i
 PRINT_KW: "print"i
+THEN_KW: "then"i
