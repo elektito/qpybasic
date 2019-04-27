@@ -25,6 +25,14 @@ def get_label(prefix):
         labels[prefix] += 1
     return '_{}_{}'.format(prefix, labels[prefix])
 
+variables = {}
+def get_variable(prefix):
+    if prefix not in variables:
+        variables[prefix] = 1
+    else:
+        variables[prefix] += 1
+    return '__{}_{}'.format(prefix, variables[prefix])
+
 def flatten_tree(t):
     ret = []
     for i in t:
@@ -77,6 +85,47 @@ class MyC(Transformer):
     def block_body_item(self, items):
         items = items[:-1] # remove final newline
         return sum(items[0], [])
+
+    def for_block(self, items):
+        if items[-2].type == 'ID': # Used "NEXT var"
+            if items[-2] != items[1]:
+                raise RuntimeError('NEXT variable does not match FOR.')
+            items = items[:-2] # remove variable and newline
+        else:
+            items = items[:-1] # remove newline
+
+        if items[5].type == 'STEP_KW':
+            _, var, start, _, end, _, step, _, body, _ = items
+            step_instrs = step
+        else:
+            _, var, start, _, end, _, body, _ = items
+            step_instrs = [Instr('pushi', 1)]
+
+        start_label = get_label('for_start')
+        end_label = get_label('for_end')
+
+        end_var = get_variable('for_end_var')
+        step_var = get_variable('for_step_var')
+
+        return \
+            start + \
+            [Instr('popl', var.value)] + \
+            end + \
+            [Instr('popl', end_var)] + \
+            step_instrs + \
+            [Instr('popl', step_var),
+             Label(start_label),
+             Instr('pushl', var.value),
+             Instr('pushl', end_var),
+             Instr('gt'),
+             Instr('jmpt', end_label)] + \
+            body + \
+            [Instr('pushl', step_var),
+             Instr('pushl', var.value),
+             Instr('add'),
+             Instr('popl', var.value),
+             Instr('jmp', start_label),
+             Label(end_label)]
 
     def if_block(self, items):
         # IF, cond, THEN, NEWLINE, then_body, rest, END, IF
@@ -274,6 +323,11 @@ xyz: cls
 print
 10 print x; y; -(x + y*2), foo
 print 1, 2, z
+
+for i = 1 to 10
+   print "boo"
+next
+
 goto 10
 end
 """

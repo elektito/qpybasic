@@ -4,7 +4,8 @@ start: program
 
 program: ((line | block) NEWLINE)* (line | block) NEWLINE?
 
-block: if_block
+block: for_block
+     | if_block
 
 line: [label | lineno] stmt_group
 
@@ -19,6 +20,8 @@ stmt: cls_stmt
     | goto_stmt
     | let_stmt
     | print_stmt
+
+for_block: FOR_KW ID "=" expr TO_KW expr [STEP_KW expr] NEWLINE block_body NEXT_KW [ID] NEWLINE
 
 if_block: IF_KW expr THEN_KW NEWLINE block_body else_list END_KW IF_KW
 
@@ -80,8 +83,12 @@ CLS_KW: "cls"i
 ELSE_KW: "else"i
 ELSEIF_KW: "elseif"i
 END_KW: "end"i
+FOR_KW: "for"i
 GOTO_KW: "goto"i
 IF_KW: "if"i
 LET_KW: "let"i
+NEXT_KW: "next"i
 PRINT_KW: "print"i
+STEP_KW: "step"i
 THEN_KW: "then"i
+TO_KW: "to"i
