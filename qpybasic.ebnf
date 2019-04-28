@@ -42,7 +42,7 @@ end_stmt: END_KW
 
 goto_stmt: GOTO_KW (ID | INT_LITERAL)
 
-let_stmt: LET_KW? ID "=" expr
+let_stmt: LET_KW? var "=" expr
 
 print_stmt: PRINT_KW (expr (SEMICOLON | COMMA))* [expr [SEMICOLON | COMMA]]
 
@@ -71,11 +71,13 @@ value: INT_LITERAL
      | var
 
 var: ID
+   | TYPED_ID
 
 NEWLINE: "\n"
 SEMICOLON: ";"
 COMMA: ","
 ID: /[a-z_][a-z0-9]*/i
+TYPED_ID: /[a-z_][a-z0-9]*[!#%&$]?/i
 INT_LITERAL: /[\-+]?\d+/
 STRING_LITERAL: /"[^"]*"/
 

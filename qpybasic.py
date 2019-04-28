@@ -17,6 +17,18 @@ class Label:
     def __str__(self):
         return '{}:'.format(self.value)
 
+class Var:
+    def __init__(self, name, typespec):
+        assert typespec in '!#%&$'
+        self.name = name
+        self.typespec = typespec
+
+    def qual_name(self):
+        return self.name + self.typespec
+
+    def __eq__(self, other):
+        return self.name == other.name and self.typespec == other.typespec
+
 labels = {}
 def get_label(prefix):
     if prefix not in labels:
@@ -26,12 +38,13 @@ def get_label(prefix):
     return '_{}_{}'.format(prefix, labels[prefix])
 
 variables = {}
-def get_variable(prefix):
+def get_variable(prefix, typespec):
     if prefix not in variables:
         variables[prefix] = 1
     else:
         variables[prefix] += 1
-    return '__{}_{}'.format(prefix, variables[prefix])
+    name = '__{}_{}'.format(prefix, variables[prefix])
+    return Var(name, typespec)
 
 def flatten_tree(t):
     ret = []
@@ -87,7 +100,7 @@ class MyC(Transformer):
         return sum(items[0], [])
 
     def for_block(self, items):
-        if items[-1].type == 'ID': # Used "NEXT var"
+        if isinstance(items[-1], Var): # Used "NEXT var"
             if items[-1] != items[1]:
                 raise RuntimeError('NEXT variable does not match FOR.')
             items = items[:-1] # remove variable
@@ -102,26 +115,26 @@ class MyC(Transformer):
         start_label = get_label('for_start')
         end_label = get_label('for_end')
 
-        end_var = get_variable('for_end_var')
-        step_var = get_variable('for_step_var')
+        end_var = get_variable('for_end_var', var.typespec)
+        step_var = get_variable('for_step_var', var.typespec)
 
         return \
             start + \
-            [Instr('popl', var.value)] + \
+            [Instr('popl', var.qual_name())] + \
             end + \
-            [Instr('popl', end_var)] + \
+            [Instr('popl', end_var.qual_name())] + \
             step_instrs + \
-            [Instr('popl', step_var),
+            [Instr('popl', step_var.qual_name()),
              Label(start_label),
-             Instr('pushl', var.value),
-             Instr('pushl', end_var),
+             Instr('pushl', var.qual_name()),
+             Instr('pushl', end_var.qual_name()),
              Instr('gt'),
              Instr('jmpt', end_label)] + \
             body + \
-            [Instr('pushl', step_var),
-             Instr('pushl', var.value),
+            [Instr('pushl', step_var.qual_name()),
+             Instr('pushl', var.qual_name()),
              Instr('add'),
-             Instr('popl', var.value),
+             Instr('popl', var.qual_name()),
              Instr('jmp', start_label),
              Label(end_label)]
 
@@ -178,7 +191,7 @@ class MyC(Transformer):
         if len(items) == 3:
             items = items[1:]
         return [items[1],
-                Instr('storel', items[0].value)]
+                Instr('storel', items[0].qual_name())]
 
     def print_stmt(self, items):
         args = []
@@ -251,11 +264,19 @@ class MyC(Transformer):
         assert len(items) == 1
         if isinstance(items[0], Token):
             return [Instr('pushi', items[0].value)]
+        elif isinstance(items[0], Var):
+            return [Instr('pushl', items[0].qual_name())]
         else:
             return items[0]
 
     def var(self, items):
-        return [Instr('pushl', items[0].value)]
+        name = items[0].value
+        if name[-1] in '!#%&$':
+            typespec = name[-1]
+            name = name[:-1]
+        else:
+            typespec = '!'
+        return Var(name, typespec)
 
     def negation(self, items):
         assert len(items) == 1
