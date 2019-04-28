@@ -115,8 +115,9 @@ def binary_op(op, items):
 
 def compare_op(op, items):
     t, instrs = binary_op('sub', items)
-    instrs += [get_conv_instr(t, '%'),
-               Instr(op)]
+    if t != '%':
+        instrs += [get_conv_instr(t, '%')]
+    instrs += [Instr(op)]
     return '%', instrs
 
 class MyC(Transformer):
