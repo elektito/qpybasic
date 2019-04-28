@@ -194,111 +194,72 @@ class MyC(Transformer):
         return args + [Instr('call', '__print', len(items) - 1)]
 
     def expr(self, items):
-        return sum(items, [])
+        assert len(items) == 1
+        return items[0]
 
     def expr_lt(self, items):
-        x, y = items
-        if isinstance(x, Instr):
-            x = [x]
-        if isinstance(y, Instr):
-            y = [y]
-        return x + y + [Instr('lt')]
+        assert len(items) == 2
+        return items + [Instr('lt')]
 
     def expr_gt(self, items):
-        x, y = items
-        if isinstance(x, Instr):
-            x = [x]
-        if isinstance(y, Instr):
-            y = [y]
-        return x + y + [Instr('gt')]
+        assert len(items) == 2
+        return items + [Instr('gt')]
 
     def expr_le(self, items):
-        x, y = items
-        if isinstance(x, Instr):
-            x = [x]
-        if isinstance(y, Instr):
-            y = [y]
-        return x + y + [Instr('le')]
+        assert len(items) == 2
+        return items + [Instr('le')]
 
     def expr_ge(self, items):
-        x, y = items
-        if isinstance(x, Instr):
-            x = [x]
-        if isinstance(y, Instr):
-            y = [y]
-        return x + y + [Instr('ge')]
+        assert len(items) == 2
+        return items + [Instr('ge')]
 
     def expr_eq(self, items):
-        x, y = items
-        if isinstance(x, Instr):
-            x = [x]
-        if isinstance(y, Instr):
-            y = [y]
-        return x + y + [Instr('eq')]
+        assert len(items) == 2
+        return items + [Instr('eq')]
 
     def expr_ne(self, items):
-        x, y = items
-        if isinstance(x, Instr):
-            x = [x]
-        if isinstance(y, Instr):
-            y = [y]
-        return x + y + [Instr('ne')]
+        assert len(items) == 2
+        return items + [Instr('ne')]
 
     def add_expr(self, items):
         return sum(items, [])
 
     def expr_add(self, items):
-        x, y = items
-        if isinstance(x, Instr):
-            x = [x]
-        if isinstance(y, Instr):
-            y = [y]
-        return x + y + [Instr('add')]
+        assert len(items) == 2
+        return items + [Instr('add')]
 
     def expr_sub(self, items):
-        x, y = items
-        if isinstance(x, Instr):
-            x = [x]
-        if isinstance(y, Instr):
-            y = [y]
-        return x + y + [Instr('sub')]
+        assert len(items) == 2
+        return items + [Instr('sub')]
 
     def mult_expr(self, items):
         return sum(items, [])
 
     def expr_mult(self, items):
-        x, y = items
-        if isinstance(x, Instr):
-            x = [x]
-        if isinstance(y, Instr):
-            y = [y]
-        return x + y + [Instr('mul')]
+        assert len(items) == 2
+        return items + [Instr('mul')]
 
     def expr_div(self, items):
-        x, y = items
-        if isinstance(x, Instr):
-            x = [x]
-        if isinstance(y, Instr):
-            y = [y]
-        return x + y + [Instr('div')]
+        assert len(items) == 2
+        return items + [Instr('div')]
 
     def unary_expr(self, items):
-        return sum(items, [])
+        assert len(items) == 1
+        return items[0]
 
     def value(self, items):
+        assert len(items) == 1
         if isinstance(items[0], Token):
             return [Instr('pushi', items[0].value)]
         else:
-            return sum(items, [])
+            return items[0]
 
     def var(self, items):
         return [Instr('pushl', items[0].value)]
 
     def negation(self, items):
-        x = items[0]
-        if isinstance(x, Instr):
-            x = [x]
-        return x + [Instr('neg')]
+        assert len(items) == 1
+        return items + [Instr('neg')]
 
 
 with open('qpybasic.ebnf') as f:
