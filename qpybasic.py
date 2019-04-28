@@ -226,7 +226,7 @@ class MyC(Transformer):
             rest = [Instr('jmp', endif_label) if r == 'JMP_TO_ENDIF' else r for r in rest]
             return cond_instrs + [Instr('jmpf', label)] + then_body + [Instr('jmp', endif_label), Label(label)] + rest + [Label(endif_label)]
         else:
-            return cond + [Instr('jmpf', endif_label)] + then_body + [Label(endif_label)]
+            return cond_instrs + [Instr('jmpf', endif_label)] + then_body + [Label(endif_label)]
 
     def elseif_sub_block(self, items):
         _, cond, _, _, then_body, rest = items
