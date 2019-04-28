@@ -267,7 +267,7 @@ class MyC(Transformer):
         elif isinstance(items[0], Var):
             return [Instr('pushl', items[0].qual_name())]
         else:
-            return items[0]
+            raise RuntimeError('Got something unexpected.')
 
     def var(self, items):
         name = items[0].value
