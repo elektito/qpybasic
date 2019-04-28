@@ -285,14 +285,15 @@ class MyC(Transformer):
     def print_stmt(self, items):
         args = []
         for a in items[1:]:
-            if isinstance(a, Instr):
+            if isinstance(a, tuple):
+                t, a = a
                 args.append(a)
             elif isinstance(a, list):
                 args += a
             elif isinstance(a, Token):
                 args.append(Instr('pushi$', '"{}"'.format(a.value)))
             else:
-                RuntimeError('Something unexpected sent to PRINT.')
+                raise RuntimeError('Something unexpected sent to PRINT.')
         return args + [Instr('call', '__print', len(items) - 1)]
 
     def expr(self, items):
