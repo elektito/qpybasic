@@ -87,12 +87,10 @@ class MyC(Transformer):
         return sum(items[0], [])
 
     def for_block(self, items):
-        if items[-2].type == 'ID': # Used "NEXT var"
-            if items[-2] != items[1]:
+        if items[-1].type == 'ID': # Used "NEXT var"
+            if items[-1] != items[1]:
                 raise RuntimeError('NEXT variable does not match FOR.')
-            items = items[:-2] # remove variable and newline
-        else:
-            items = items[:-1] # remove newline
+            items = items[:-1] # remove variable
 
         if items[5].type == 'STEP_KW':
             _, var, start, _, end, _, step, _, body, _ = items

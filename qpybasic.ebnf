@@ -21,7 +21,7 @@ stmt: cls_stmt
     | let_stmt
     | print_stmt
 
-for_block: FOR_KW ID "=" expr TO_KW expr [STEP_KW expr] NEWLINE block_body NEXT_KW [ID] NEWLINE
+for_block: FOR_KW var "=" expr TO_KW expr [STEP_KW expr] NEWLINE block_body NEXT_KW [var]
 
 if_block: IF_KW expr THEN_KW NEWLINE block_body else_list END_KW IF_KW
 
