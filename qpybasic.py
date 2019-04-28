@@ -203,7 +203,9 @@ class MyC(Transformer):
              Label(start_label),
              Instr('pushl', var.qual_name()),
              Instr('pushl', end_var.qual_name()),
-             Instr('gt'),
+             Instr('sub' + var.typespec)] + \
+            ([] if var.typespec == '%' else [Instr('conv' + var.typespec + '%')]) + \
+            [Instr('gt'),
              Instr('jmpt', end_label)] + \
             body + \
             [Instr('pushl', step_var.qual_name()),
