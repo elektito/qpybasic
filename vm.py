@@ -87,6 +87,7 @@ class Machine:
 
     def exec_end(self):
         self.stopped = True
+        logger.debug('EXEC: end')
         return 0
 
 
