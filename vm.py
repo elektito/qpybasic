@@ -261,7 +261,7 @@ class Machine:
         value = self.mem.read(2)
         value, = struct.unpack('>H', value)
         if value == 0x02: #cls
-            pass
+            self.syscall_cls()
         elif value == 0x03: #concat
             pass
         elif value == 0x04: #print
@@ -302,6 +302,13 @@ class Machine:
         s = self.mem.read(length)
         logger.debug(f'READ string of length {length} from addr {hex(addr)}: "{s.decode("ascii")}"')
         return s
+
+
+    def syscall_cls(self):
+        logger.debug('SYSCALL: cls')
+        seq =  '\033[2J'    # clear screen
+        seq += '\033[1;1H'  # move cursor to screen top-left
+        print(seq)
 
 
     def syscall_print(self):
