@@ -225,7 +225,7 @@ class Machine:
         idx = self.mem.read(2)
         idx, = struct.unpack('>H', idx)
         self.mem.seek(self.fp + idx)
-        value = self.mem.read(2)
+        value = self.mem.read(4)
         self.push(value)
         logger.debug('EXEC: readf4')
         return 2
