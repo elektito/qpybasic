@@ -1,40 +1,41 @@
 %ignore /[ \t\f]+/
 
-start: program
+program: ((_line | block) _NEWLINE)* (_line | block) _NEWLINE?
 
-program: ((line | block) NEWLINE)* (line | block) NEWLINE?
+?block: for_block
+      | if_block
 
-block: for_block
-     | if_block
+_line: [label | lineno] _stmt_group
 
-line: [label | lineno] stmt_group
-
-stmt_group: (stmt ":")* [stmt ":"?]
+_stmt_group: (stmt ":")* [stmt ":"?]
 
 label: ID ":"
 
 lineno: INT_LITERAL
 
-stmt: cls_stmt
-    | end_stmt
-    | goto_stmt
-    | let_stmt
-    | print_stmt
+?stmt: cls_stmt
+     | end_stmt
+     | goto_stmt
+     | let_stmt
+     | print_stmt
 
-for_block: FOR_KW var "=" expr TO_KW expr [STEP_KW expr] NEWLINE block_body NEXT_KW [var]
+for_block: FOR_KW var "=" expr TO_KW expr step_phrase _NEWLINE block_body next_stmt
 
-if_block: IF_KW expr THEN_KW NEWLINE block_body else_list END_KW IF_KW
+step_phrase: [STEP_KW expr]
 
-else_list: ELSEIF_KW expr THEN_KW NEWLINE block_body else_list  -> elseif_sub_block
-         | ELSE_KW NEWLINE block_body                           -> else_sub_block
+next_stmt: NEXT_KW [var]
+
+if_block: IF_KW expr THEN_KW _NEWLINE block_body else_list END_KW IF_KW
+
+else_list: ELSEIF_KW expr THEN_KW _NEWLINE block_body else_list  -> elseif_sub_block
+         | ELSE_KW _NEWLINE block_body                           -> else_sub_block
          |
 
-block_body: block_body_item block_body
-          |
+block_body: _block_body_item*
 
-block_body_item: block NEWLINE
-               | line NEWLINE
-               | NEWLINE
+_block_body_item: block _NEWLINE
+                | _line _NEWLINE
+                | _NEWLINE
 
 cls_stmt: CLS_KW
 
@@ -46,25 +47,25 @@ let_stmt: LET_KW? var "=" expr
 
 print_stmt: PRINT_KW (expr (SEMICOLON | COMMA))* [expr [SEMICOLON | COMMA]]
 
-expr: add_expr
-    | expr "<" add_expr   -> expr_lt
-    | expr ">" add_expr   -> expr_gt
-    | expr "<=" add_expr  -> expr_le
-    | expr ">=" add_expr  -> expr_ge
-    | expr "=" add_expr   -> expr_eq
-    | expr "<>" add_expr   -> expr_ne
+?expr: addsub_expr
+     | expr "<" addsub_expr   -> expr_lt
+     | expr ">" addsub_expr   -> expr_gt
+     | expr "<=" addsub_expr  -> expr_le
+     | expr ">=" addsub_expr  -> expr_ge
+     | expr "=" addsub_expr   -> expr_eq
+     | expr "<>" addsub_expr   -> expr_ne
 
-add_expr: mult_expr
-        | add_expr "+" mult_expr  -> expr_add
-        | add_expr "-" mult_expr  -> expr_sub
+?addsub_expr: muldiv_expr
+            | addsub_expr "+" muldiv_expr  -> expr_add
+            | addsub_expr "-" muldiv_expr  -> expr_sub
 
-mult_expr: unary_expr
-         | mult_expr "*" unary_expr  -> expr_mult
-         | mult_expr "/" unary_expr  -> expr_div
+?muldiv_expr: unary_expr
+            | muldiv_expr "*" unary_expr  -> expr_mul
+            | muldiv_expr "/" unary_expr  -> expr_div
 
-unary_expr: value
-          | "-" expr      -> negation
-          | "(" expr ")"
+?unary_expr: value
+           | "-" expr      -> negation
+           | "(" expr ")"
 
 value: NUMERIC_LITERAL
      | STRING_LITERAL
@@ -73,7 +74,7 @@ value: NUMERIC_LITERAL
 var: ID
    | TYPED_ID
 
-NEWLINE: "\n"
+_NEWLINE: "\n"
 SEMICOLON: ";"
 COMMA: ","
 ID: /[a-z_][a-z0-9]*/i
