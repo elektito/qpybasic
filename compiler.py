@@ -697,10 +697,16 @@ class Assembler:
         instr, imm = instr
         t = instr[-1]
 
-        if t == '$':
-            imm = STRING_ADDR + self.compiler.string_literals[imm[1:-1]]
-        else:
-            imm = int(imm)
+        if isinstance(imm, str):
+            if t != '$' and imm[-1] in '%&!#':
+                imm = imm[:-1]
+
+            if t == '$':
+                imm = STRING_ADDR + self.compiler.string_literals[imm[1:-1]]
+            elif t in '!#':
+                imm = float(imm)
+            else:
+                imm = int(imm)
 
         if t == '%':
             imm = struct.pack('>h', imm)
