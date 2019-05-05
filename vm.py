@@ -37,6 +37,7 @@ class Machine:
                 0x1a: 'jmpt',
                 0x1c: 'lt',
                 0x1f: 'mul_single',
+                0x22: 'neg_int',
                 0x24: 'neg_single',
                 0x26: 'pushi_int',
                 0x28: 'pushi_single',
@@ -185,6 +186,16 @@ class Machine:
         result = struct.pack('>f', result)
         self.push(result)
         logger.debug('EXEC: neg!')
+        return 0
+
+
+    def exec_neg_int(self):
+        x = self.pop(2)
+        x, = struct.unpack('>h', x)
+        result = -x
+        result = struct.pack('>h', result)
+        self.push(result)
+        logger.debug('EXEC: neg%')
         return 0
 
 
