@@ -434,6 +434,9 @@ class Compiler:
 
 
     def process_next_stmt(self, ast):
+        # NEXT statements with a matching FOR will be processed by the
+        # process_for_block function. This will only be called when
+        # there is a NEXT without FOR.
         self.error('NEXT without FOR.')
 
 
