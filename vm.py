@@ -253,7 +253,7 @@ class Machine:
         elif value == 0x03: #concat
             pass
         elif value == 0x04: #print
-            pass
+            self.syscall_print()
         logger.debug('EXEC: syscall')
         return 2
 
@@ -281,6 +281,73 @@ class Machine:
         self.mem.seek(self.sp)
         self.mem.write(value)
         logger.debug(f'PUSH: {len(value)}')
+
+
+    def read_string(self, addr):
+        self.mem.seek(addr)
+        length = self.mem.read(2)
+        length, = struct.unpack('>h', length)
+        s = self.mem.read(length)
+        logger.debug(f'READ string of length {length} from addr {hex(addr)}: "{s.decode("ascii")}"')
+        return s
+
+
+    def syscall_print(self):
+        logger.debug('SYSCALL: print')
+        buf = ''
+        def print_number(n):
+            nonlocal buf
+            if n > 0:
+                buf += f' {n} '
+            else:
+                buf += f'{n} '
+
+        nargs = self.pop(2)
+        nargs, = struct.unpack('>h', nargs)
+        logger.info(f'nargs is {nargs}')
+        for i in range(nargs):
+            typeid = self.pop(2)
+            typeid, = struct.unpack('>h', typeid)
+            if typeid == 1: #int
+                n = self.pop(2)
+                n, = struct.unpack('>h', n)
+                print_number(n)
+            elif typeid == 2: # long
+                n = self.pop(4)
+                n, = struct.unpack('>i', n)
+                print_number(n)
+            elif typeid == 3: # single
+                n = self.pop(4)
+                n, = struct.unpack('>f', n)
+                print_number(n)
+            elif typeid == 4: # double
+                n = self.pop(8)
+                n, = struct.unpack('>d', n)
+                print_number(n)
+            elif typeid == 5: # string
+                n = self.pop(4)
+                n, = struct.unpack('>I', n)
+                s = self.read_string(n)
+                buf += s.decode('ascii')
+            elif typeid == 6: # semicolon
+                pass # nothing to do
+            elif typeid == 7: # comma
+                n = 14 - (len(buf) % 14)
+                buf += n * ' '
+            else:
+               self.error(f'Unknown PRINT type id: {typeid}')
+
+        # if last type id is a semicolon or a comma do not add a
+        # newline
+        if nargs == 0 or typeid not in (6, 7):
+            buf += '\n'
+
+        print(buf, end='')
+
+
+    def error(self, msg):
+        logger.error(msg)
+        exit(1)
 
 
 def parse_module(module):

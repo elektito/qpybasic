@@ -509,19 +509,38 @@ class Compiler:
 
 
     def process_print_stmt(self, ast):
-        n = 0
-        instrs = []
+        # passing arguments to PRINT:
+        #  - the arguments are passed in reverse order
+        #  - each argument is preceded by an integer (%) value determining
+        #    its type.
+        #  - semicolons and commas are also considered arguments.
+        #  - for semicolons and commas, only the type is passed.
+
+        type_values = {
+            '%': 1,
+            '&': 2,
+            '!': 3,
+            '#': 4,
+            '$': 5,
+            ';': 6,
+            ',': 7,
+        }
+
+        parts = []
         for i in ast.children[1:]:
             if isinstance(i, Token):
-                instrs += [Instr('pushi$', f'"{i.value}"')]
-                n += 1
+                parts.append([Instr('pushi%', type_values[i.value])])
             else:
                 expr = Expr(i, self)
-                instrs += [Instr('pushi$', f'"{expr.typespec}"')]
-                instrs += expr.instrs
-                n += 2
-        self.instrs += [Instr('pushi%', n)] + \
-                       instrs + \
+                parts.append(expr.instrs + \
+                             [Instr('pushi%', type_values[expr.typespec])])
+
+        # push the arguments in reverse order, and after that, the
+        # number of arguments. this is so that we can read the
+        # arguments one at a time, armed with proper information to
+        # handle each.
+        self.instrs += sum(reversed(parts), []) + \
+                       [Instr('pushi%', len(ast.children) - 1)] + \
                        [Instr('syscall', '__print')]
 
 
@@ -668,7 +687,6 @@ class Assembler:
     def assemble_jmp_c(self, instr, opcode, p, labels):
         instr, dest = instr
         diff = labels[dest] - INITIAL_ADDR - p
-        print(dest, diff, dest, p)
         if diff < -32768 or diff >32767:
             raise RuntimeError('Conditional jump too long.')
         dest = struct.pack('>h', diff)
