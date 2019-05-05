@@ -633,6 +633,7 @@ class Assembler:
             'writef1': (3, 0x33, self.assemble_writef),
             'writef2': (3, 0x34, self.assemble_writef),
             'writef4': (3, 0x35, self.assemble_writef),
+            'writef8': (3, 0x36, self.assemble_writef),
         }
 
         # phase 1: calculate label addresses
