@@ -53,10 +53,10 @@ class Machine:
 
 
     def exec_add_single(self):
-        x = self.pop(4)
         y = self.pop(4)
-        x, = struct.unpack('>f', x)
+        x = self.pop(4)
         y, = struct.unpack('>f', y)
+        x, = struct.unpack('>f', x)
         result = x + y
         result = struct.pack('>f', result)
         self.push(result)
@@ -169,10 +169,10 @@ class Machine:
 
 
     def exec_mul_single(self):
-        x = self.pop(4)
         y = self.pop(4)
-        x, = struct.unpack('>f', x)
+        x = self.pop(4)
         y, = struct.unpack('>f', y)
+        x, = struct.unpack('>f', x)
         result = x * y
         result = struct.pack('>f', result)
         self.push(result)
@@ -232,10 +232,10 @@ class Machine:
 
 
     def exec_sub_int(self):
-        x = self.pop(2)
         y = self.pop(2)
-        x, = struct.unpack('>h', x)
+        x = self.pop(2)
         y, = struct.unpack('>h', y)
+        x, = struct.unpack('>h', x)
         result = x - y
         if result < -32768:
             result = -32768
@@ -246,10 +246,10 @@ class Machine:
 
 
     def exec_sub_single(self):
-        x = self.pop(4)
         y = self.pop(4)
-        x, = struct.unpack('>f', x)
+        x = self.pop(4)
         y, = struct.unpack('>f', y)
+        x, = struct.unpack('>f', x)
         result = x - y
         result = struct.pack('>f', result)
         self.push(result)
