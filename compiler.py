@@ -291,7 +291,7 @@ class Module:
                                        INITIAL_ADDR)
 
         # const section header: type, len, load_addr
-        total_len = sum(len(i) for i in self.string_literals)
+        total_len = sum(len(i) + 2 for i in self.string_literals)
         const_section_hdr = struct.pack('>BII',
                                         self.const_section_type,
                                         total_len,
