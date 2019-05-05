@@ -406,7 +406,7 @@ class Compiler:
             self.gen_set_var_code(step_var, e)
         else:
             self.instrs += [Instr(f'pushi{var.typespec}', 1),
-                            Instr(f'readf{var.typelen}', step_var)]
+                            Instr(f'writef{var.typelen}', step_var)]
 
         end_var = Var(self.gen_var('for_end', var.typespec), self)
         e = Expr(end, self)
@@ -425,7 +425,11 @@ class Compiler:
         self.instrs += [Instr('gt'),
                         Instr('jmpt', end_label)]
         self.compile_ast(body)
-        self.instrs += [Instr('jmp', top_label),
+        self.instrs += [Instr(f'readf{var.typelen}', var),
+                        Instr(f'readf{step_var.typelen}', step_var),
+                        Instr(f'add{var.typespec}'),
+                        Instr(f'writef{var.typelen}', var),
+                        Instr('jmp', top_label),
                         Label(end_label)]
 
 
