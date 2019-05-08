@@ -1,4 +1,5 @@
 import struct
+from collections import OrderedDict
 from lark import Lark, Token, Tree
 
 
@@ -12,6 +13,22 @@ INITIAL_ADDR = 0x100000
 STRING_ADDR = 0x80000000
 
 typespec_chars = '%&!#$'
+
+typekw_to_typespec = {
+    'INTEGER': '%',
+    'LONG': '&',
+    'SINGLE': '!',
+    'DOUBLE': '#',
+    'STRING': '$',
+}
+
+typespec_to_typename = {
+    '%': 'INTEGER',
+    '&': 'LONG',
+    '!': 'SINGLE',
+    '#': 'DOUBLE',
+    '$': 'STRING',
+}
 
 
 def get_type_name(typespec):
@@ -54,6 +71,12 @@ def get_literal_typespec(literal):
                 raise RuntimeError('Integer value out of possible range.')
 
 
+def get_default_type(var_name):
+    # For now, the default type for all variables is single. This can
+    # be changed when we implement DEFINT and friends.
+    return Type('SINGLE')
+
+
 class Instr(tuple):
     def __new__(cls, *args):
         return super(Instr, cls).__new__(cls, tuple(args))
@@ -65,66 +88,205 @@ class Instr(tuple):
         return '\t' + self[0] + '\t' + ', '.join(str(i) for i in self[1:])
 
 
-class Var:
-    def __init__(self, source, compiler):
-        if isinstance(source, str):
-            name = source
+class Type:
+    def __init__(self, name, *, is_array=False):
+        if name in typespec_chars:
+            self.name = typespec_to_typename[name]
         else:
-            name = source.children[0].value
-        if name[-1] in typespec_chars:
-            self.name, self.typespec = name[:-1], name[-1]
-        else:
-            self.name = name
-            self.typespec = self.get_default_typespec(name)
+            self.name = name.upper()
 
-        self.typelen = {
-            '%': 2,
-            '&': 4,
-            '!': 4,
-            '#': 8,
-            '$': 4,
-        }[self.typespec]
-
-        self.routine = compiler.cur_routine
-        if self.routine not in compiler.local_vars:
-            compiler.local_vars[self.routine] = []
-
-        if self not in compiler.local_vars[self.routine]:
-            compiler.local_vars[self.routine].append(self)
-
-        # calculate this variable's index in the stack frame
-        self.idx = 0
-        for v in compiler.local_vars[self.routine]:
-            if v == self:
-                break
-            else:
-                self.idx += v.typelen
+        self.is_array = is_array
 
 
-    def qual_name(self):
-        return f'{self.name}{self.typespec}'
+    @property
+    def typespec(self):
+        return {
+            'INTEGER': '%',
+            'LONG': '&',
+            'SINGLE': '!',
+            'DOUBLE': '#',
+            'STRING': '$'
+        }.get(self.name, '')
 
 
-    def get_default_typespec(self, var_name):
-        # For now, the default type for all variables is single. This
-        # can be changed when we implement DEFINT and friends.
-        return '!'
+    @property
+    def is_basic(self):
+        return self.name in [
+            'INTEGER',
+            'LONG',
+            'SINGLE',
+            'DOUBLE',
+            'STRING'
+        ]
 
 
-    def gen_read_instructions(self):
-        return [Instr(f'readf{self.typelen}', self)]
-
-
-    def gen_write_instructions(self):
-        return [Instr(f'writef{self.typelen}', self)]
+    def get_size(self):
+        # user-defined types and arrays not supported yet
+        assert self.is_basic and not self.is_array
+        return {
+            'INTEGER': 2,
+            'LONG': 4,
+            'SINGLE': 4,
+            'DOUBLE': 8,
+            'STRING': 4,
+        }[self.name]
 
 
     def __repr__(self):
-        return '<Var {}{}>'.format(self.name, self.typespec)
+        if self.get_typespec() == '':
+            name = f'User-Defined: {self.name}'
+        else:
+            name = self.name
+        suffix = '()' if self.is_array else ''
+        return f'<Type {name}{suffix}>'
 
 
     def __eq__(self, other):
-        return self.name == other.name and self.typespec == other.typespec
+        return isinstance(other, Type) and \
+            self.name == other.name and \
+            self.is_array == other.is_array
+
+
+    def __hash__(self):
+        return hash((self.name, self.is_array))
+
+
+class Var:
+    def __init__(self, used_name, routine, *, status='used', is_param=False, type=None, byref=False):
+        assert status in ['used', 'dimmed']
+        assert not byref or is_param
+
+        if isinstance(used_name, Tree):
+            assert len(used_name.children) == 1 and isinstance(used_name.children[0], Token)
+            used_name = used_name.children[0].value
+
+        self.routine = routine
+        self.byref = byref
+
+        if status == 'dimmed':
+            if used_name in self.routine.no_type_dimmed:
+                # already declared with something like "DIM x$"
+                raise RuntimeError('Use AS on first DIM.') ##### <------------------------------------- FIX the error to the original
+
+            if type != None and used_name[-1] in typespec_chars:
+                raise RuntimeError('Invalid variable name.')
+            elif type != None and used_name[-1] not in typespec_chars:
+                self.name = used_name
+                self.type = type
+            elif type == None and used_name[-1] in typespec_chars:
+                # DIM x$
+                self.name = used_name[:-1]
+                self.type = Type(used_name[-1])
+
+                # this is almost the same as using the variable
+                # without DIM, except for the fact that you can't DIM
+                # it again. so we add the name to a separate list, so
+                # that we won't let the variable to be DIM'ed again.
+                routine.no_type_dimmed.add(self.name)
+            else: # type == None and used_name[-1] not in typespec_chars:
+                self.name = used_name
+                self.type = get_default_type(used_name)
+
+            if self.name in routine.dimmed_vars:
+                raise RuntimeError('Duplicate definition.')
+
+            if self.name not in routine.no_type_dimmed:
+                # not properly dimmed (no AS clause), and can't be
+                # used without the typespec, so do not add it to the
+                # list.
+                routine.dimmed_vars[self.name] = self
+
+            if is_param:
+                self.routine.params.append(self)
+            elif self not in self.routine.local_vars:
+                self.routine.local_vars.append(self)
+        elif status == 'used':
+            assert type == None
+
+            if used_name[-1] in typespec_chars:
+                self.name = used_name[:-1]
+                self.type = Type(used_name[-1])
+            else:
+                self.name = used_name
+                if used_name in routine.dimmed_vars:
+                    self.type = routine.dimmed_vars[used_name].type
+                else:
+                    self.type = get_default_type(used_name)
+
+            if self not in self.routine.params and self not in self.routine.local_vars:
+                self.routine.local_vars.append(self)
+
+            if self in self.routine.params:
+                pidx = self.routine.params.index(self)
+                self.idx = 8 + sum(v.size for v in self.routine.params[:pidx])
+                self.byref = self.routine.params[pidx].byref
+            else:
+                lidx = self.routine.local_vars.index(self)
+                self.idx = -sum(v.size for v in self.routine.local_vars[:lidx+1])
+                self.byref = False
+
+        if self not in routine.all_vars:
+            routine.all_vars.append(self)
+
+        self.is_param = is_param
+
+
+    def gen_read_instructions(self):
+        if self.byref:
+            return [Instr(f'readf4', self),
+                    Instr(f'readi{self.type.get_size()}')]
+        else:
+            return [Instr(f'readf{self.type.get_size()}', self)]
+
+
+    def gen_write_instructions(self):
+        if self.byref:
+            return [Instr(f'readf4', self),
+                    Instr(f'writei{self.size}')]
+        else:
+            return [Instr(f'writef{self.size}', self)]
+
+
+    @property
+    def size(self):
+        if self.byref:
+            return 4
+        else:
+            return self.type.get_size()
+
+
+    def __eq__(self, other):
+        return isinstance(other, Var) and \
+            self.name == other.name and \
+            self.type == other.type
+
+
+    def __hash__(self):
+        return hash((self.name, self.type))
+
+
+    def __repr__(self):
+        pass_type = ' BYREF' if self.byref else ''
+        if hasattr(self, 'idx'):
+            return f'<Var {self.name}{self.type.typespec} idx={self.idx}{pass_type}>'
+        else:
+            return f'<Var {self.name}{self.type.typespec}{pass_type}>'
+
+
+class Routine:
+    def __init__(self, name, type):
+        self.name = name
+        self.type = type
+        self.params = []
+        self.local_vars = []
+        self.dimmed_vars = OrderedDict()
+        self.no_type_dimmed = set()
+        self.all_vars = []
+        self.instrs = []
+
+
+    def __repr__(self):
+        return f'<{self.type.upper()} {self.name} {self.params}>'
 
 
 class Expr:
@@ -207,9 +369,9 @@ class Expr:
             self.instrs += [Instr('pushi' + t, v.value)]
             self.typespec = t
         elif isinstance(v, Tree): # variable
-            var = Var(v, self.parent)
+            var = Var(v, self.parent.cur_routine)
             self.instrs += var.gen_read_instructions()
-            self.typespec = var.typespec
+            self.typespec = var.type.typespec
         else:
             assert False, 'This should not have happened.'
 
@@ -266,6 +428,11 @@ class Label:
     def __init__(self, value):
         self.value = value
 
+
+    def __repr__(self):
+        return f'<Label "{self.value}">'
+
+
     def __str__(self):
         return '{}:'.format(self.value)
 
@@ -312,20 +479,18 @@ class Compiler:
         with open('qpybasic.ebnf') as f:
             grammar_text = f.read()
 
-        self.parser = Lark(grammar_text,
+        self.parser = Lark(grammar_text, #parser='lalr', debug=True,
                            propagate_positions=True,
                            start='program')
 
 
     def compile(self, code):
-        self.loc = INITIAL_ADDR
-        self.labels = {}
         self.instrs = []
-        self.cur_routine = '__main'
+        self.cur_routine = Routine('__main', 'sub')
+        self.routines = {'__main': self.cur_routine}
         self.gen_labels = {}
         self.gen_vars = {}
         self.endif_labels = []
-        self.local_vars = {'__main': []}
         self.string_literals = {}
         self.last_string_literal_idx = 0
 
@@ -341,12 +506,18 @@ class Compiler:
         # Create the main stack frame. The argument to the 'frame'
         # instruction is stack frame size, the actual value of which
         # will be filled in later.
-        self.instrs = [Instr('frame', '__main')]
+        self.instrs = [Label('__start'),
+                       Instr('call', '__main'),
+                       Instr('end'),
+                       Label('__main'),
+                       Instr('frame', '__main')]
 
         ast = self.parser.parse(code)
         self.compile_ast(ast)
 
-        self.instrs += [Instr('end')]
+        self.instrs += [Instr('unframe', '__main'),
+                        Instr('ret', 0)]
+        self.instrs += sum((r.instrs for r in self.routines.values()), [])
 
         assembler = Assembler(self)
         self.bytecode = assembler.assemble(self.instrs)
@@ -364,19 +535,46 @@ class Compiler:
 
     def process_label(self, t):
         label = t.children[0].value
-        self.labels[label] = self.loc
         self.instrs += [Label(label)]
 
 
     def process_lineno(self, t):
         label = '__lineno_' + t.children[0].value
-        self.labels[label] = self.loc
         self.instrs += [Label(label)]
 
 
     def process_block_body(self, ast):
         for i in ast.children:
             self.compile_ast(i)
+
+
+    def process_call_stmt(self, ast):
+        if len(ast.children) == 2:
+            sub_name, args = ast.children
+        else:
+            _, sub_name, args = ast.children
+
+        if sub_name not in self.routines:
+            raise RuntimeError(f'No such sub-routine: {sub_name}')
+
+        i = len(args.children) - 1
+        for a in reversed(args.children):
+            if isinstance(a.children[0], Tree) and a.children[0].data == 'var':
+                # just a variable: send byref
+                v = Var(a.children[0].children[0].value, self.cur_routine)
+                if v.type != self.routines[sub_name].params[i].type:
+                    raise RuntimeError('Parameter type mismatch.')
+                self.instrs += [Instr('pushfp', v)]
+            else:
+                e = Expr(a, self)
+                typespec = self.routines[sub_name].params[i].type.typespec
+                v = Var(self.gen_var('rvalue', typespec), self.cur_routine)
+                self.gen_set_var_code(v, e)
+                self.instrs += [Instr('pushfp', v)]
+
+            i -= 1
+
+        self.instrs += [Instr('call', f'__sub_{sub_name}')]
 
 
     def process_cls_stmt(self, ast):
@@ -389,26 +587,26 @@ class Compiler:
 
     def process_for_block(self, ast):
         _, var, start, _, end, step, body, next_stmt = ast.children
-        var = Var(var, self)
-        if var.typespec == '$':
+        var = Var(var, self.cur_routine)
+        if var.type.typespec == '$':
             self.error('Invalid FOR variable.')
 
         if len(next_stmt.children) == 2:
             # "NEXT var" is used. Check if NEXT variable matches FOR
             # variable.
-            next_var = Var(next_stmt.children[1], self)
+            next_var = Var(next_stmt.children[1], self.cur_routine)
             if next_var != var:
                 self.error('NEXT variable does not match FOR.')
 
-        step_var = Var(self.gen_var('for_step', var.typespec), self)
+        step_var = Var(self.gen_var('for_step', var.type.typespec), self.cur_routine)
         if step.children:
             e = Expr(step.children[1], self)
             self.gen_set_var_code(step_var, e)
         else:
-            self.instrs += [Instr(f'pushi{var.typespec}', 1),
-                            Instr(f'writef{var.typelen}', step_var)]
+            self.instrs += [Instr(f'pushi{var.type.typespec}', 1),
+                            Instr(f'writef{var.size}', step_var)]
 
-        end_var = Var(self.gen_var('for_end', var.typespec), self)
+        end_var = Var(self.gen_var('for_end', var.type.typespec), self.cur_routine)
         e = Expr(end, self)
         self.gen_set_var_code(end_var, e)
 
@@ -418,19 +616,57 @@ class Compiler:
         top_label = self.gen_label('for_top')
         end_label = self.gen_label('for_bottom')
         self.instrs += [Label(top_label),
-                        Instr(f'readf{var.typelen}', var),
-                        Instr(f'readf{end_var.typelen}', end_var),
-                        Instr(f'sub{var.typespec}')]
-        self.instrs += gen_conv_instrs(var.typespec, '%')
+                        Instr(f'readf{var.size}', var),
+                        Instr(f'readf{end_var.size}', end_var),
+                        Instr(f'sub{var.type.typespec}')]
+        self.instrs += gen_conv_instrs(var.type.typespec, '%')
         self.instrs += [Instr('gt'),
                         Instr('jmpt', end_label)]
         self.compile_ast(body)
-        self.instrs += [Instr(f'readf{var.typelen}', var),
-                        Instr(f'readf{step_var.typelen}', step_var),
-                        Instr(f'add{var.typespec}'),
-                        Instr(f'writef{var.typelen}', var),
+        self.instrs += [Instr(f'readf{var.size}', var),
+                        Instr(f'readf{step_var.size}', step_var),
+                        Instr(f'add{var.type.typespec}'),
+                        Instr(f'writef{var.size}', var),
                         Instr('jmp', top_label),
                         Label(end_label)]
+
+
+    def process_sub_block(self, ast):
+        _, name, params, body, _, _ = ast.children
+
+        saved_instrs = self.instrs
+        self.instrs = []
+        self.cur_routine = Routine(name.value, 'sub')
+
+        self.instrs += [Label(f'__sub_{name}'),
+                        Instr('frame', name.value)]
+
+        for p in params.children:
+            if len(p.children) == 3:
+                # form: var AS type
+                pname, _, ptype = p.children
+                pname = pname.value
+                ptype = Type(ptype.children[0].value)
+            else:
+                # form: var$
+                pname = p.children[0].value
+                ptype = None
+
+            if any(pname == i.name for i in self.cur_routine.local_vars):
+                self.error('Duplicate parameter.')
+
+            var = Var(pname, self.cur_routine, type=ptype, is_param=True, status='dimmed', byref=True)
+
+        self.compile_ast(body)
+
+        arg_size = sum(v.size for v in self.cur_routine.params)
+        self.instrs += [Instr('unframe', self.cur_routine.name),
+                        Instr('ret', arg_size)]
+        self.cur_routine.instrs = self.instrs
+        self.routines[name.value] = self.cur_routine
+
+        self.cur_routine = self.routines['__main']
+        self.instrs = saved_instrs
 
 
     def process_next_stmt(self, ast):
@@ -499,17 +735,17 @@ class Compiler:
             ast.children = ast.children[1:]
 
         var, expr = ast.children
-        var = Var(var, self)
+        var = Var(var, self.cur_routine)
         expr = Expr(expr, self)
         self.gen_set_var_code(var, expr)
 
 
     def gen_set_var_code(self, var, expr):
-        conv_instrs = gen_conv_instrs(expr.typespec, var.typespec)
+        conv_instrs = gen_conv_instrs(expr.typespec, var.type.typespec)
         if conv_instrs == None:
             self.error('Cannot convert {} to {}.'
                        .format(get_type_name(expr.typespec),
-                               get_type_name(var.typespec)))
+                               get_type_name(var.type.typespec)))
         else:
             self.instrs += expr.instrs + conv_instrs
             self.instrs += var.gen_write_instructions()
@@ -641,6 +877,18 @@ class Assembler:
             'writef2': (3, 0x34, self.assemble_writef),
             'writef4': (3, 0x35, self.assemble_writef),
             'writef8': (3, 0x36, self.assemble_writef),
+            'ret': (3, 0x37, self.assemble_ret),
+            'unframe': (3, 0x38, self.assemble_unframe),
+            'readf8': (3, 0x39, self.assemble_readf),
+            'readi1': (1, 0x3a, self.assemble_one_byte),
+            'readi2': (1, 0x3b, self.assemble_one_byte),
+            'readi4': (1, 0x3c, self.assemble_one_byte),
+            'readi8': (1, 0x3d, self.assemble_one_byte),
+            'writei1': (1, 0x3e, self.assemble_one_byte),
+            'writei2': (1, 0x3f, self.assemble_one_byte),
+            'writei4': (1, 0x40, self.assemble_one_byte),
+            'writei8': (1, 0x41, self.assemble_one_byte),
+            'pushfp': (3, 0x42, self.assemble_pushfp),
         }
 
         # phase 1: calculate label addresses
@@ -682,7 +930,7 @@ class Assembler:
 
     def assemble_frame(self, instr, opcode, _, __):
         instr, routine = instr
-        frame_size = sum(v.typelen for v in self.compiler.local_vars[routine])
+        frame_size = sum(v.size for v in self.compiler.routines[routine].local_vars)
         return bytes([opcode]) + struct.pack('>H', frame_size)
 
 
@@ -732,10 +980,24 @@ class Assembler:
         return bytes([opcode]) + imm
 
 
+    def assemble_pushfp(self, instr, opcode, _, __):
+        instr, imm  = instr
+        if isinstance(imm, Var):
+            imm = imm.idx
+        imm = struct.pack('>h', imm)
+        return bytes([opcode]) + imm
+
+
     def assemble_readf(self, instr, opcode, _, __):
         instr, imm = instr
         if isinstance(imm, Var):
             imm = imm.idx
+        imm = struct.pack('>h', imm)
+        return bytes([opcode]) + imm
+
+
+    def assemble_ret(self, instr, opcode, _, __):
+        instr, imm = instr
         imm = struct.pack('>H', imm)
         return bytes([opcode]) + imm
 
@@ -751,14 +1013,19 @@ class Assembler:
         return bytes([opcode]) + imm
 
 
+    def assemble_unframe(self, instr, opcode, _, __):
+        instr, routine = instr
+        frame_size = sum(v.size for v in self.compiler.routines[routine].local_vars)
+        return bytes([opcode]) + struct.pack('>H', frame_size)
+
+
     def assemble_writef(self, instr, opcode, _, __):
         instr, imm = instr
         if isinstance(imm, Var):
             imm = imm.idx
-        imm = struct.pack('>H', imm)
+        imm = struct.pack('>h', imm)
         return bytes([opcode]) + imm
 
 
     def get_str_literal_idx(self, literal):
         pass
-

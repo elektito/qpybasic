@@ -26,7 +26,10 @@ class Machine:
             self.mem.seek(self.ip)
             opcode = self.mem.read_byte()
             opname = {
+                0x01: 'add_integer',
                 0x03: 'add_single',
+                0x05: 'call',
+                0x06: 'conv_int_long',
                 0x07: 'conv_int_single',
                 0x0c: 'conv_single_int',
                 0x13: 'end',
@@ -42,14 +45,36 @@ class Machine:
                 0x26: 'pushi_int',
                 0x28: 'pushi_single',
                 0x2a: 'pushi_string',
+                0x2c: 'readf2',
                 0x2d: 'readf4',
                 0x2e: 'sub_int',
                 0x30: 'sub_single',
                 0x32: 'syscall',
+                0x34: 'writef2',
                 0x35: 'writef4',
+                0x37: 'ret',
+                0x38: 'unframe',
+                0x3b: 'readi2',
+                0x3c: 'readi4',
+                0x40: 'writei4',
+                0x42: 'pushfp',
             }[opcode]
             n = getattr(self, f'exec_{opname}')()
             self.ip += n + 1
+
+
+    def exec_add_integer(self):
+        y = self.pop(2)
+        x = self.pop(2)
+        y, = struct.unpack('>h', y)
+        x, = struct.unpack('>h', x)
+        result = x + y
+        if result > 32767 or result < -32768:
+            result = -32768
+        result = struct.pack('>h', result)
+        self.push(result)
+        logger.debug('EXEC: add%')
+        return 0
 
 
     def exec_add_single(self):
@@ -61,6 +86,23 @@ class Machine:
         result = struct.pack('>f', result)
         self.push(result)
         logger.debug('EXEC: add!')
+        return 0
+
+
+    def exec_call(self):
+        target = self.mem.read(4)
+        target, = struct.unpack('>I', target)
+        self.push(struct.pack('>I', self.ip + 5))
+        logger.debug('EXEC: call')
+        return target - self.ip - 1
+
+
+    def exec_conv_int_long(self):
+        value = self.pop(2)
+        value, = struct.unpack('>h', value)
+        value = struct.pack('>i', value)
+        self.push(value)
+        logger.debug('EXEC: conv%&')
         return 0
 
 
@@ -94,8 +136,9 @@ class Machine:
     def exec_frame(self):
         frame_size = self.mem.read(2)
         frame_size, = struct.unpack('>H', frame_size)
-        self.sp -= frame_size
+        self.push(struct.pack('>I', self.fp))
         self.fp = self.sp
+        self.sp -= frame_size
         logger.debug('EXEC: frame')
         return 2
 
@@ -200,6 +243,15 @@ class Machine:
         return 0
 
 
+    def exec_pushfp(self):
+        idx = self.mem.read(2)
+        idx, = struct.unpack('>h', idx)
+        addr = self.fp + idx
+        self.push(struct.pack('>I', addr))
+        logger.debug('EXEC: pushfp')
+        return 2
+
+
     def exec_pushi_int(self):
         value = self.mem.read(2)
         self.push(value)
@@ -221,14 +273,51 @@ class Machine:
         return 4
 
 
+    def exec_readf2(self):
+        idx = self.mem.read(2)
+        idx, = struct.unpack('>h', idx)
+        self.mem.seek(self.fp + idx)
+        value = self.mem.read(2)
+        self.push(value)
+        logger.debug('EXEC: readf2')
+        return 2
+
+
     def exec_readf4(self):
         idx = self.mem.read(2)
-        idx, = struct.unpack('>H', idx)
+        idx, = struct.unpack('>h', idx)
         self.mem.seek(self.fp + idx)
         value = self.mem.read(4)
         self.push(value)
         logger.debug('EXEC: readf4')
         return 2
+
+
+    def exec_readi2(self):
+        addr, = struct.unpack('>I', self.pop(4))
+        self.mem.seek(addr)
+        value = self.mem.read(2)
+        self.push(value)
+        logger.debug('EXEC: readi2')
+        return 0
+
+
+    def exec_readi4(self):
+        addr, = struct.unpack('>I', self.pop(4))
+        self.mem.seek(addr)
+        value = self.mem.read(4)
+        self.push(value)
+        logger.debug('EXEC: readi4')
+        return 0
+
+
+    def exec_ret(self):
+        arg_size = self.mem.read(2)
+        arg_size, = struct.unpack('>H', arg_size)
+        target, = struct.unpack('>I', self.pop(4))
+        self.sp -= arg_size
+        logger.debug('EXEC: ret')
+        return target - self.ip - 1
 
 
     def exec_sub_int(self):
@@ -270,14 +359,42 @@ class Machine:
         return 2
 
 
+    def exec_unframe(self):
+        frame_size = self.mem.read(2)
+        frame_size, = struct.unpack('>H', frame_size)
+        self.sp = self.fp
+        self.fp, = struct.unpack('>I', self.pop(4))
+        logger.debug('EXEC: unframe')
+        return 2
+
+
+    def exec_writef2(self):
+        idx = self.mem.read(2)
+        idx, = struct.unpack('>h', idx)
+        value = self.pop(2)
+        self.mem.seek(self.fp + idx)
+        self.mem.write(value)
+        logger.debug('EXEC: writef2')
+        return 2
+
+
     def exec_writef4(self):
         idx = self.mem.read(2)
-        idx, = struct.unpack('>H', idx)
+        idx, = struct.unpack('>h', idx)
         value = self.pop(4)
         self.mem.seek(self.fp + idx)
         self.mem.write(value)
         logger.debug('EXEC: writef4')
         return 2
+
+
+    def exec_writei4(self):
+        addr, = struct.unpack('>I', self.pop(4))
+        value = self.pop(4)
+        self.mem.seek(addr)
+        self.mem.write(value)
+        logger.debug('EXEC: writei4')
+        return 0
 
 
     def pop(self, size):

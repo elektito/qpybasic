@@ -1,19 +1,23 @@
 %ignore /[ \t\f]+/
 
-program: ((_line | block) _NEWLINE)* (_line | block) _NEWLINE?
+program: ((_line | block | toplevel_block) _NEWLINE)*
 
 ?block: for_block
       | if_block
 
+?toplevel_block: sub_block
+
 _line: [label | lineno] _stmt_group
 
-_stmt_group: (stmt ":")* [stmt ":"?]
+_stmt_group: (stmt ":") _stmt_group
+           | stmt?
 
 label: ID ":"
 
 lineno: INT_LITERAL
 
-?stmt: cls_stmt
+?stmt: call_stmt
+     | cls_stmt
      | end_stmt
      | goto_stmt
      | let_stmt
@@ -31,11 +35,29 @@ else_list: ELSEIF_KW expr THEN_KW _NEWLINE block_body else_list  -> elseif_sub_b
          | ELSE_KW _NEWLINE block_body                           -> else_sub_block
          |
 
+sub_block: SUB_KW ID parameter_list _NEWLINE block_body END_KW SUB_KW
+
+parameter_list: "(" parameter_definition ("," parameter_definition)* ")"
+              |
+
+parameter_definition: TYPED_ID [AS_KW typename]
+
+typename: INTEGER_KW
+        | LONG_KW
+        | SINGLE_KW
+        | DOUBLE_KW
+        | STRING_KW
+
 block_body: _block_body_item*
 
 _block_body_item: block _NEWLINE
                 | _line _NEWLINE
                 | _NEWLINE
+
+call_stmt: [CALL_KW] ID argument_list
+
+argument_list: expr ("," expr)*
+             |
 
 cls_stmt: CLS_KW
 
@@ -45,7 +67,16 @@ goto_stmt: GOTO_KW (ID | INT_LITERAL)
 
 let_stmt: LET_KW? var "=" expr
 
-print_stmt: PRINT_KW (expr (SEMICOLON | COMMA))* [expr [SEMICOLON | COMMA]]
+// the .10 suffix gives a higher priority to this rule than any other
+// rule that might ambiguously match, together with this. In
+// particular, print_stmt and call_stmt are ambiguous and here we always
+// give priority to print_stmt relative to that.
+print_stmt.10: PRINT_KW (expr _print_sep)* expr
+             | PRINT_KW expr [_print_sep]
+
+_print_sep: SEMICOLON
+          | COMMA
+
 
 ?expr: addsub_expr
      | expr "<" addsub_expr   -> expr_lt
@@ -83,16 +114,24 @@ INT_LITERAL: /\d+/
 NUMERIC_LITERAL: /[\-+]?\d+(\.\d*)?[!#%&]?/
 STRING_LITERAL: /"[^"]*"/
 
+AS_KW: "as"i
+CALL_KW: "call"i
 CLS_KW: "cls"i
+DOUBLE_KW: "double"i
 ELSE_KW: "else"i
 ELSEIF_KW: "elseif"i
 END_KW: "end"i
 FOR_KW: "for"i
 GOTO_KW: "goto"i
 IF_KW: "if"i
+INTEGER_KW: "integer"i
 LET_KW: "let"i
+LONG_KW: "long"i
 NEXT_KW: "next"i
 PRINT_KW: "print"i
+SINGLE_KW: "single"i
 STEP_KW: "step"i
+STRING_KW: "string"i
+SUB_KW: "sub"i
 THEN_KW: "then"i
 TO_KW: "to"i

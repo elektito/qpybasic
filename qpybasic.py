@@ -29,6 +29,19 @@ next
 goto 10
 end
 """
+prog = r"""
+sub foo(x as string, y as integer, z&)
+   print "sub_foo:"; z&
+   y = 190
+end sub
+
+sub bar(n as integer, r as long)
+   print n, r
+end sub
+
+foo "foobar", x%, 12000
+print "main:"; x%
+"""
 c = Compiler()
 module = c.compile(prog)
 for i in c.instrs:
