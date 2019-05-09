@@ -27,6 +27,7 @@ class Machine:
             opcode = self.mem.read_byte()
             opname = {
                 0x01: 'add_integer',
+                0x02: 'add_long',
                 0x03: 'add_single',
                 0x05: 'call',
                 0x06: 'conv_int_long',
@@ -35,6 +36,7 @@ class Machine:
                 0x13: 'end',
                 0x14: 'frame',
                 0x17: 'gt',
+                0x1b: 'le',
                 0x18: 'jmp',
                 0x19: 'jmpf',
                 0x1a: 'jmpt',
@@ -74,6 +76,20 @@ class Machine:
         result = struct.pack('>h', result)
         self.push(result)
         logger.debug('EXEC: add%')
+        return 0
+
+
+    def exec_add_long(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>i', y)
+        x, = struct.unpack('>i', x)
+        result = x + y
+        if result > 2**31-1 or result < -2**31:
+            result = -2**31
+        result = struct.pack('>i', result)
+        self.push(result)
+        logger.debug('EXEC: add&')
         return 0
 
 
@@ -151,6 +167,17 @@ class Machine:
         else:
             self.push(FALSE)
         logger.debug('EXEC: gt')
+        return 0
+
+
+    def exec_le(self):
+        value = self.pop(2)
+        value, = struct.unpack('>h', value)
+        if value <= 0:
+            self.push(TRUE)
+        else:
+            self.push(FALSE)
+        logger.debug('EXEC: le')
         return 0
 
 

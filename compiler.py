@@ -657,13 +657,13 @@ class Compiler:
 
             var = Var(pname, self.cur_routine, type=ptype, is_param=True, status='dimmed', byref=True)
 
+        self.routines[name.value] = self.cur_routine
         self.compile_ast(body)
 
         arg_size = sum(v.size for v in self.cur_routine.params)
         self.instrs += [Instr('unframe', self.cur_routine.name),
                         Instr('ret', arg_size)]
         self.cur_routine.instrs = self.instrs
-        self.routines[name.value] = self.cur_routine
 
         self.cur_routine = self.routines['__main']
         self.instrs = saved_instrs
