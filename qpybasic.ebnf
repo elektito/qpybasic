@@ -1,10 +1,17 @@
 %ignore /[ \t\f]+/
 
-program: (_NEWLINE* _part _NEWLINE+)*
-       | _NEWLINE* _part
-       | _NEWLINE*
+program: _nlopt _part_list
 
-_part: (_line | block | toplevel_block)
+_part_list: _part _part_list
+          |
+
+_part: (_line | block | toplevel_block) _nl
+
+_nlopt: _nl
+      |
+
+_nl: _NEWLINE _nl
+   | _NEWLINE
 
 
 ?block: for_block
@@ -26,9 +33,12 @@ lineno: INT_LITERAL
      | end_stmt
      | goto_stmt
      | let_stmt
+     | next_stmt
      | print_stmt
 
-for_block: FOR_KW var "=" expr TO_KW expr step_phrase _NEWLINE block_body next_stmt
+for_block: _for_stmt block_body next_stmt
+
+_for_stmt: FOR_KW var "=" expr TO_KW expr step_phrase _nl
 
 step_phrase: [STEP_KW expr]
 
@@ -111,6 +121,9 @@ var: ID
    | TYPED_ID
 
 _NEWLINE: "\n"
+        | "\r\n"
+        | "\r"
+        | ":"
 SEMICOLON: ";"
 COMMA: ","
 ID: /[a-z_][a-z0-9]*/i

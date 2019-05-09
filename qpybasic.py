@@ -43,7 +43,7 @@ foo "foobar", x%, 12000
 print "main:"; x%
 """
 c = Compiler()
-module = c.compile(prog)
+module = c.compile(prog + '\n')
 for i in c.instrs:
     print(i)
 with open('foo.mod', 'wb') as f:
