@@ -69,7 +69,8 @@ _block_body_item: block _NEWLINE
                 | _line _NEWLINE
                 | _NEWLINE
 
-call_stmt: [CALL_KW] ID argument_list
+call_stmt: ID argument_list
+         | CALL_KW ID "(" argument_list ")"
 
 argument_list: expr ("," expr)*
              |
