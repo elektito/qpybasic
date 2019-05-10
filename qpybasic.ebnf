@@ -38,11 +38,11 @@ lineno: INT_LITERAL
 
 for_block: _for_stmt block_body next_stmt
 
-_for_stmt: FOR_KW var "=" expr TO_KW expr step_phrase _nl
+_for_stmt: FOR_KW TYPED_ID "=" expr TO_KW expr step_phrase _nl
 
 step_phrase: [STEP_KW expr]
 
-next_stmt: NEXT_KW [var]
+next_stmt: NEXT_KW [TYPED_ID]
 
 if_block: IF_KW expr THEN_KW _NEWLINE block_body else_list END_KW IF_KW
 
@@ -77,11 +77,11 @@ argument_list: expr ("," expr)*
 
 cls_stmt: CLS_KW
 
-end_stmt: END_KW
+end_stmt: END_CMD
 
 goto_stmt: GOTO_KW (ID | INT_LITERAL)
 
-let_stmt: LET_KW? var "=" expr
+let_stmt: LET_KW? TYPED_ID "=" expr
 
 // the .10 suffix gives a higher priority to this rule than any other
 // rule that might ambiguously match, together with this. In
@@ -116,10 +116,7 @@ _print_sep: SEMICOLON
 
 value: NUMERIC_LITERAL
      | STRING_LITERAL
-     | var
-
-var: ID
-   | TYPED_ID
+     | TYPED_ID
 
 _NEWLINE: "\n"
         | "\r\n"
@@ -154,3 +151,5 @@ STRING_KW: "string"i
 SUB_KW: "sub"i
 THEN_KW: "then"i
 TO_KW: "to"i
+
+%declare END_CMD

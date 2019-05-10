@@ -60,6 +60,12 @@ for i% = 1 to 10
 next
 """
 
+prog = r"""
+if 1 then
+   print 100
+end if
+"""
+
 c = Compiler()
 module = c.compile(prog + '\n')
 for i in c.instrs:

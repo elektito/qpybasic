@@ -474,12 +474,40 @@ class Module:
             const_section
 
 
+class PostLex:
+    def __init__(self, compiler):
+        self.compiler = compiler
+
+        self.always_accept = ()
+
+
+    def process(self, stream):
+        prev_tok = None
+        for tok in stream:
+            if tok.value.lower() == 'end' and prev_tok.type == '_NEWLINE':
+                try:
+                    next_tok = next(stream)
+                except StopIteration:
+                    yield Token.new_borrow_pos('END_CMD', 'END_CMD', tok)
+                else:
+                    if next_tok.type == '_NEWLINE':
+                        yield Token.new_borrow_pos('END_CMD', 'END_CMD', tok)
+                    else:
+                        yield tok
+                    yield next_tok
+            else:
+                yield tok
+            prev_tok = tok
+
+
 class Compiler:
     def __init__(self):
         with open('qpybasic.ebnf') as f:
             grammar_text = f.read()
 
-        self.parser = Lark(grammar_text, #parser='lalr', debug=True,
+        self.parser = Lark(grammar_text,
+                           parser='lalr',
+                           postlex=PostLex(self),
                            propagate_positions=True,
                            start='program')
 
