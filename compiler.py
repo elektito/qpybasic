@@ -362,16 +362,19 @@ class Expr:
 
     def process_value(self, ast):
         v = ast.children[0]
-        if isinstance(v, Token): # literal
-            if v.type == 'STRING_LITERAL':
-                self.parent.add_string_literal(v[1:-1])
-            t = get_literal_typespec(v.value)
-            self.instrs += [Instr('pushi' + t, v.value)]
-            self.typespec = t
-        elif isinstance(v, Tree): # variable
+        if v.type == 'TYPED_ID': # variable
             var = Var(v, self.parent.cur_routine)
             self.instrs += var.gen_read_instructions()
             self.typespec = var.type.typespec
+        elif v.type == 'STRING_LITERAL':
+            self.parent.add_string_literal(v[1:-1])
+            t = get_literal_typespec(v.value)
+            self.instrs += [Instr('pushi' + t, v.value)]
+            self.typespec = t
+        elif v.type == 'NUMERIC_LITERAL':
+            t = get_literal_typespec(v.value)
+            self.instrs += [Instr('pushi' + t, v.value)]
+            self.typespec = t
         else:
             assert False, 'This should not have happened.'
 
