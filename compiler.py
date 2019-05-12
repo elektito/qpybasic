@@ -590,13 +590,14 @@ class Compiler:
 
         i = len(args.children) - 1
         for a in reversed(args.children):
-            if isinstance(a.children[0], Tree) and a.children[0].data == 'var':
+            if isinstance(a, Tree) and a.data == 'value' and a.children[0].type == 'TYPED_ID':
                 # just a variable: send byref
-                v = Var(a.children[0].children[0].value, self.cur_routine)
+                v = Var(a.children[0].value, self.cur_routine)
                 if v.type != self.routines[sub_name].params[i].type:
                     raise RuntimeError('Parameter type mismatch.')
                 self.instrs += [Instr('pushfp', v)]
             else:
+
                 e = Expr(a, self)
                 typespec = self.routines[sub_name].params[i].type.typespec
                 v = Var(self.gen_var('rvalue', typespec), self.cur_routine)

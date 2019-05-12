@@ -48,19 +48,19 @@ sub fib(n as integer, r as long)
    if n <= 2 then
       r = 1
    else
-      fib n-1, r1&
-      fib n-2, r2&
+      call fib(n-1, r1&)
+      call fib(n-2, r2&)
       r = r1& + r2&
    end if
 end sub
 
-for i% = 1 to 10
+for i% = 1 to 10 step 1
    call fib(i%, r&)
    print "fib", i%, r&
 next
 """
 
-prog = r"""
+xprog = r"""
 if 1 then
    print 100
 end if
