@@ -50,23 +50,23 @@ def gen_conv_instrs(t1, t2):
         return None
 
 
-def get_literal_typespec(literal):
+def get_literal_type(literal):
     if literal.startswith('"'): # string literal
-        return '$'
+        return Type('$')
     elif literal[-1] in '!#%&': # numeric literal with typespec
         # sanity check first
         if '.' in literal and literal[-1] not in '!#':
             raise RuntimeError('Invalid numeric literal: {}'.format(literal))
-        return literal[-1]
+        return Type(literal[-1])
     else: # numeric literal without typespec
         if '.' in literal: # single or double
-            return '#' # for now, consider all float literals as double
+            return Type('#') # for now, consider all float literals as double
         else: # integer or long
             v = int(literal)
             if -32768 <= v < 32768:
-                return '%'
+                return Type('%')
             elif -2**31 <= v < 2**31:
-                return '&'
+                return Type('&')
             else:
                 raise RuntimeError('Integer value out of possible range.')
 
@@ -373,16 +373,16 @@ class Expr:
         if v.type == 'TYPED_ID': # variable
             var = Var(v, self.parent.cur_routine)
             self.instrs += var.gen_read_instructions()
-            self.typespec = var.type.typespec
+            self.type = var.type
         elif v.type == 'STRING_LITERAL':
             self.parent.add_string_literal(v[1:-1])
-            t = get_literal_typespec(v.value)
-            self.instrs += [Instr('pushi' + t, v.value)]
-            self.typespec = t
+            t = get_literal_type(v.value)
+            self.instrs += [Instr('pushi' + t.typespec, v.value)]
+            self.type = t
         elif v.type == 'NUMERIC_LITERAL':
-            t = get_literal_typespec(v.value)
-            self.instrs += [Instr('pushi' + t, v.value)]
-            self.typespec = t
+            t = get_literal_type(v.value)
+            self.instrs += [Instr('pushi' + t.typespec, v.value)]
+            self.type = t
         else:
             assert False, 'This should not have happened.'
 
@@ -390,12 +390,12 @@ class Expr:
     def process_negation(self, ast):
         arg = ast.children[0]
         e = Expr(arg, self.parent)
-        self.instrs += e.instrs + [Instr(f'neg{e.typespec}')]
-        self.typespec = e.typespec
+        self.instrs += e.instrs + [Instr(f'neg{e.type.typespec}')]
+        self.type = e.type
 
 
     def binary_op(self, op, left, right):
-        ltype, rtype = left.typespec, right.typespec
+        ltype, rtype = left.type.typespec, right.type.typespec
 
         if ltype == rtype == '$' and op == 'add':
             self.instrs += [Instr('syscall', '__concat')]
@@ -424,13 +424,13 @@ class Expr:
 
         instrs += [Instr(op + t)]
 
-        self.typespec = t
+        self.type = Type(t)
         self.instrs += instrs
 
 
     def compare_op(self, op, left, right):
         self.binary_op('sub', left, right)
-        self.instrs += gen_conv_instrs(self.typespec, '%')
+        self.instrs += gen_conv_instrs(self.type.typespec, '%')
         self.instrs += [Instr(op)]
         self.typespec = '%'
 
@@ -832,11 +832,10 @@ class Compiler:
 
 
     def gen_set_var_code(self, var, expr):
-        conv_instrs = gen_conv_instrs(expr.typespec, var.type.typespec)
+        conv_instrs = gen_conv_instrs(expr.type.typespec, var.type.typespec)
         if conv_instrs == None:
             self.error('Cannot convert {} to {}.'
-                       .format(get_type_name(expr.typespec),
-                               get_type_name(var.type.typespec)))
+                       .format(expr.type.name, var.type.name))
         else:
             self.instrs += expr.instrs + conv_instrs
             self.instrs += var.gen_write_instructions()
@@ -867,7 +866,7 @@ class Compiler:
             else:
                 expr = Expr(i, self)
                 parts.append(expr.instrs + \
-                             [Instr('pushi%', type_values[expr.typespec])])
+                             [Instr('pushi%', type_values[expr.type.typespec])])
 
         # push the arguments in reverse order, and after that, the
         # number of arguments. this is so that we can read the
