@@ -133,7 +133,7 @@ class Type:
 
 
     def __repr__(self):
-        if self.get_typespec() == '':
+        if self.typespec == '':
             name = f'User-Defined: {self.name}'
         else:
             name = self.name
