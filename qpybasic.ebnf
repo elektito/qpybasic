@@ -33,7 +33,6 @@ lineno: INT_LITERAL
      | end_stmt
      | goto_stmt
      | let_stmt
-     | next_stmt
      | print_stmt
 
 for_block: _for_stmt block_body next_stmt
@@ -50,7 +49,7 @@ else_list: ELSEIF_KW expr THEN_KW _NEWLINE block_body else_list  -> elseif_sub_b
          | ELSE_KW _NEWLINE block_body                           -> else_sub_block
          |
 
-sub_block: SUB_KW ID parameter_list _NEWLINE block_body END_KW SUB_KW
+sub_block: SUB_KW TYPED_ID parameter_list _NEWLINE block_body END_KW SUB_KW
 
 parameter_list: "(" parameter_definition ("," parameter_definition)* ")"
               |
@@ -69,8 +68,8 @@ _block_body_item: block _NEWLINE
                 | _line _NEWLINE
                 | _NEWLINE
 
-call_stmt: ID argument_list
-         | CALL_KW ID "(" argument_list ")"
+call_stmt: TYPED_ID argument_list
+         | CALL_KW TYPED_ID "(" argument_list ")"
 
 argument_list: expr ("," expr)*
              |
@@ -127,7 +126,7 @@ COMMA: ","
 ID: /[a-z_][a-z0-9]*/i
 TYPED_ID: /[a-z_][a-z0-9]*[!#%&$]?/i
 INT_LITERAL: /\d+/
-NUMERIC_LITERAL: /[\-+]?\d+(\.\d*)?[!#%&]?/
+NUMERIC_LITERAL: /\d+(\.\d*)?[!#%&]?/
 STRING_LITERAL: /"[^"]*"/
 
 AS_KW: "as"i

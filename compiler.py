@@ -510,6 +510,7 @@ class Compiler:
 
         self.parser = Lark(grammar_text,
                            parser='lalr',
+                           lexer='standard',
                            postlex=PostLex(self),
                            propagate_positions=True,
                            start='program')
