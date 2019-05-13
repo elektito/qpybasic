@@ -77,6 +77,28 @@ def get_default_type(var_name):
     return Type('SINGLE')
 
 
+def builtin_func_abs(parent, args):
+    if len(args) != 1:
+        raise RuntimeError('Invalid number of arguments passed to function.')
+
+    arg, = args
+    e = Expr(arg, parent)
+    instrs = e.instrs
+    end_label = parent.gen_label('abs_end')
+    instrs += [Instr(f'dup{e.type.get_size()}'),
+               Instr(f'sgn{e.type.typespec}'),
+               Instr('lt'),
+               Instr('jmpf', end_label),
+               Instr(f'neg{e.type.typespec}'),
+               Label(end_label)]
+    return e.type, e.instrs
+
+
+builtin_functions = {
+    'abs': builtin_func_abs,
+}
+
+
 class Instr(tuple):
     def __new__(cls, *args):
         return super(Instr, cls).__new__(cls, tuple(args))
@@ -366,6 +388,16 @@ class Expr:
         left, right = ast.children
         left, right = Expr(left, self.parent), Expr(right, self.parent)
         self.compare_op('ne', left, right)
+
+
+    def process_function_call(self, ast):
+        fname, args = ast.children
+        fname = fname.lower()
+        if fname in builtin_functions:
+            f = builtin_functions[fname]
+            self.type, self.instrs = f(self.parent, args.children)
+        else:
+            raise RuntimeError('User-defined functioned not yet supported.')
 
 
     def process_value(self, ast):
@@ -979,6 +1011,13 @@ class Assembler:
             'writei4': (1, 0x40, self.assemble_one_byte),
             'writei8': (1, 0x41, self.assemble_one_byte),
             'pushfp': (3, 0x42, self.assemble_pushfp),
+            'dup1': (1, 0x43, self.assemble_one_byte),
+            'dup2': (1, 0x44, self.assemble_one_byte),
+            'dup4': (1, 0x45, self.assemble_one_byte),
+            'sgn%': (1, 0x46, self.assemble_one_byte),
+            'sgn&': (1, 0x47, self.assemble_one_byte),
+            'sgn!': (1, 0x48, self.assemble_one_byte),
+            'sgn#': (1, 0x49, self.assemble_one_byte),
         }
 
         # phase 1: calculate label addresses

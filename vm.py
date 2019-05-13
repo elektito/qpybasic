@@ -60,6 +60,8 @@ class Machine:
                 0x3c: 'readi4',
                 0x40: 'writei4',
                 0x42: 'pushfp',
+                0x44: 'dup2',
+                0x46: 'sgn_integer',
             }[opcode]
             n = getattr(self, f'exec_{opname}')()
             self.ip += n + 1
@@ -140,6 +142,14 @@ class Machine:
         value = struct.pack('>h', value)
         self.push(value)
         logger.debug('EXEC: conv%!')
+        return 0
+
+
+    def exec_dup2(self):
+        value = self.pop(2)
+        self.push(value)
+        self.push(value)
+        logger.debug('EXEC: dup2')
         return 0
 
 
@@ -345,6 +355,19 @@ class Machine:
         self.sp -= arg_size
         logger.debug('EXEC: ret')
         return target - self.ip - 1
+
+
+    def exec_sgn_integer(self):
+        value = self.pop(2)
+        value, = struct.unpack('>h', value)
+        if value > 0:
+            self.push(struct.pack('>h', 1))
+        elif value == 0:
+            self.push(struct.pack('>h', 0))
+        else:
+            self.push(struct.pack('>h', -1))
+        logger.debug('EXEC: sgn%')
+        return 0
 
 
     def exec_sub_int(self):

@@ -119,6 +119,7 @@ _print_sep: SEMICOLON
 value: NUMERIC_LITERAL
      | STRING_LITERAL
      | TYPED_ID
+     | TYPED_ID "(" argument_list ")"  -> function_call
 
 _NEWLINE: "\n"
         | "\r\n"
