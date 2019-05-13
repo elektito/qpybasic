@@ -484,10 +484,18 @@ class PostLex:
         self.always_accept = ()
 
 
+    # This post-lexer converts a single END keyword, to an END_CMD
+    # terminal. This makes the keyword available to be properly used
+    # in constructs like END IF and END SUB.
+    #
+    # Notice that this post-lexer only works with Lark's "standard"
+    # lexer, because it consumes two tokens and then spits them back
+    # (or one END_CMD token in their place).
     def process(self, stream):
         prev_tok = None
         for tok in stream:
-            if tok.value.lower() == 'end' and prev_tok.type == '_NEWLINE':
+            if tok.value.lower() == 'end' and \
+               (prev_tok == None or prev_tok.type == '_NEWLINE'):
                 try:
                     next_tok = next(stream)
                 except StopIteration:
