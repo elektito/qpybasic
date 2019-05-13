@@ -151,6 +151,14 @@ class Type:
         return hash((self.name, self.is_array))
 
 
+    @staticmethod
+    def from_var_name(var_name):
+        if var_name[-1] in typespec_chars:
+            return Type(var_name[-1])
+        else:
+            return Type(get_default_type(var_name))
+
+
 class Var:
     def __init__(self, used_name, routine, *, status='used', is_param=False, type=None, byref=False):
         assert status in ['used', 'dimmed']
@@ -534,6 +542,10 @@ class Compiler:
         self.string_literals = {}
         self.last_string_literal_idx = 0
 
+        # maps the names of declared subs to a list of types, which
+        # are the types of the parameters it receives.
+        self.declared_subs = {}
+
         # add string literals used by the compiler
         self.add_string_literal(';')
         self.add_string_literal(',')
@@ -622,6 +634,38 @@ class Compiler:
         self.instrs += [Instr('syscall', '__cls')]
 
 
+    def process_declare_stmt(self, ast):
+        if self.cur_routine.name != '__main':
+            raise RuntimeError('DECLARE statement only valid in top-level.')
+
+        _, _, name, params = ast.children
+        name = name.value
+        param_types = []
+        for p in params.children:
+            if len(p.children) == 3:
+                # form: var AS type
+                pname, _, ptype = p.children
+                pname = pname.value
+                ptype = Type(ptype.children[0].value)
+            else:
+                # form: var$
+                pname = p.children[0].value
+                ptype = Type.from_var_name(pname)
+
+            param_types.append(ptype)
+
+        if name in self.routines:
+            defined_param_types = [v.type for v in self.routines[name].params]
+            if param_types != defined_param_types:
+                raise RuntimeError('DECLARE statement does not match definition.')
+
+        if name in self.declared_subs:
+            if param_types != self.declared_subs[name]:
+                raise RuntimeError('Conflicting DECLARE statements.')
+        else:
+            self.declared_subs[name] = param_types
+
+
     def process_end_stmt(self, ast):
         self.instrs += [Instr('end')]
 
@@ -697,6 +741,12 @@ class Compiler:
                 self.error('Duplicate parameter.')
 
             var = Var(pname, self.cur_routine, type=ptype, is_param=True, status='dimmed', byref=True)
+
+        if name in self.declared_subs:
+            defined_param_types = [v.type for v in self.cur_routine.params]
+            if defined_param_types != self.declared_subs[name]:
+                raise RuntimeError(
+                    'SUB definition does not match previous DECLARE.')
 
         self.routines[name.value] = self.cur_routine
         self.compile_ast(body)

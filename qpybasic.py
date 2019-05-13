@@ -44,6 +44,8 @@ print "main:"; x%
 """
 
 prog = r"""
+declare sub fib(n as integer, r&)
+
 sub fib(n as integer, r as long)
    if n <= 2 then
       r = 1

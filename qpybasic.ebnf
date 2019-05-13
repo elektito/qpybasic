@@ -30,6 +30,7 @@ lineno: INT_LITERAL
 
 ?stmt: call_stmt
      | cls_stmt
+     | declare_stmt
      | end_stmt
      | goto_stmt
      | let_stmt
@@ -75,6 +76,8 @@ argument_list: expr ("," expr)*
              |
 
 cls_stmt: CLS_KW
+
+declare_stmt: DECLARE_KW SUB_KW TYPED_ID parameter_list
 
 end_stmt: END_CMD
 
@@ -132,6 +135,7 @@ STRING_LITERAL: /"[^"]*"/
 AS_KW: "as"i
 CALL_KW: "call"i
 CLS_KW: "cls"i
+DECLARE_KW: "declare"i
 DOUBLE_KW: "double"i
 ELSE_KW: "else"i
 ELSEIF_KW: "elseif"i
