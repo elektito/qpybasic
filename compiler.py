@@ -391,11 +391,16 @@ class Expr:
 
 
     def process_function_call(self, ast):
-        fname, args = ast.children
+        if len(ast.children) == 2:
+            fname, args = ast.children
+            args = args.children
+        else:
+            fname, = ast.children
+            args = []
         fname = fname.lower()
         if fname in builtin_functions:
             f = builtin_functions[fname]
-            self.type, self.instrs = f(self.parent, args.children)
+            self.type, self.instrs = f(self.parent, args)
         else:
             raise RuntimeError('User-defined functioned not yet supported.')
 
