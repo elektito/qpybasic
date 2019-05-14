@@ -178,7 +178,7 @@ class Type:
         if var_name[-1] in typespec_chars:
             return Type(var_name[-1])
         else:
-            return Type(get_default_type(var_name))
+            return get_default_type(var_name)
 
 
 class Var:
