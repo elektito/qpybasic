@@ -581,7 +581,7 @@ def main():
         'loggers': {
             __name__: {
                 'handlers': ['console'],
-                'level': 'DEBUG',
+                'level': 'ERROR',
                 'propagate': True,
             }
         },
