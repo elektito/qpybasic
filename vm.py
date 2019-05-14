@@ -67,6 +67,8 @@ class Machine:
                 0x42: 'pushfp',
                 0x44: 'dup2',
                 0x46: 'sgn_integer',
+                0x4a: 'unframe_r',
+                0x4b: 'ret_r',
             }[opcode]
             n = getattr(self, f'exec_{opname}')()
             if isinstance(n, Jump):
@@ -358,6 +360,19 @@ class Machine:
         return Jump(target)
 
 
+    def exec_ret_r(self):
+        arg_size = self.mem.read(2)
+        retv_size = self.mem.read(2)
+        arg_size, = struct.unpack('>H', arg_size)
+        retv_size, = struct.unpack('>H', retv_size)
+        retv = self.pop(retv_size)
+        target, = struct.unpack('>I', self.pop(4))
+        self.sp -= arg_size
+        self.push(retv)
+        logger.debug('EXEC: ret_r')
+        return Jump(target)
+
+
     def exec_sgn_integer(self):
         value = self.pop(2)
         value, = struct.unpack('>h', value)
@@ -417,6 +432,25 @@ class Machine:
         self.fp, = struct.unpack('>I', self.pop(4))
         logger.debug('EXEC: unframe')
         return 2
+
+
+    def exec_unframe_r(self):
+        frame_size = self.mem.read(2)
+        retv_idx = self.mem.read(2)
+        retv_size = self.mem.read(2)
+        frame_size, = struct.unpack('>H', frame_size)
+        retv_idx, = struct.unpack('>h', retv_idx)
+        retv_size, = struct.unpack('>H', retv_size)
+
+        # read return value
+        self.mem.seek(self.fp + retv_idx)
+        retv = self.mem.read(retv_size)
+
+        self.sp = self.fp
+        self.fp, = struct.unpack('>I', self.pop(4))
+        self.push(retv)
+        logger.debug('EXEC: unframe_r')
+        return 6
 
 
     def exec_writef2(self):

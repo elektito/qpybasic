@@ -402,15 +402,45 @@ class Expr:
             f = builtin_functions[fname]
             self.type, self.instrs = f(self.parent, args)
         else:
-            raise RuntimeError('User-defined functioned not yet supported.')
+            if fname not in self.parent.routines and \
+               fname not in self.parent.declared_functions:
+                print('bb', self.parent.declared_functions)
+                raise RuntimeError(f'No such function: {fname}')
+
+            i = len(args) - 1
+            for a in reversed(args):
+                if isinstance(a, Tree) and a.data == 'value' and a.children[0].type == 'TYPED_ID':
+                    # just a variable: send byref
+                    v = Var(a.children[0].value, self.parent.cur_routine)
+                    if fname in self.parent.routines:
+                        if v.type != self.parent.routines[fname].params[i].type:
+                            raise RuntimeError('Parameter type mismatch.')
+                    else:
+                        if v.type != self.parent.declared_functions[fname][i]:
+                            raise RuntimeError('Parameter type mismatch.')
+                    self.instrs += [Instr('pushfp', v)]
+                else:
+                    e = Expr(a, self.parent)
+                    typespec = self.parent.routines[fname].params[i].type.typespec
+                    v = Var(self.parent.gen_var('rvalue', typespec), self.parent.cur_routine)
+                    self.parent.gen_set_var_code(v, e)
+                    self.instrs += [Instr('pushfp', v)]
+
+                i -= 1
+
+            self.instrs += [Instr('call', f'__function_{fname}')]
+            self.type = Type.from_var_name(fname)
 
 
     def process_value(self, ast):
         v = ast.children[0]
-        if v.type == 'TYPED_ID': # variable
-            var = Var(v, self.parent.cur_routine)
-            self.instrs += var.gen_read_instructions()
-            self.type = var.type
+        if v.type == 'TYPED_ID': # variable or function call
+            if self.parent.is_function(v):
+                self.process_function_call(ast)
+            else:
+                var = Var(v, self.parent.cur_routine)
+                self.instrs += var.gen_read_instructions()
+                self.type = var.type
         elif v.type == 'STRING_LITERAL':
             self.parent.add_string_literal(v[1:-1])
             t = get_literal_type(v.value)
@@ -579,9 +609,10 @@ class Compiler:
         self.string_literals = {}
         self.last_string_literal_idx = 0
 
-        # maps the names of declared subs to a list of types, which
-        # are the types of the parameters it receives.
+        # map the names of declared subs/functions to a list of types,
+        # which are the types of the parameters each receives.
         self.declared_subs = {}
+        self.declared_functions = {}
 
         # add string literals used by the compiler
         self.add_string_literal(';')
@@ -675,7 +706,7 @@ class Compiler:
         if self.cur_routine.name != '__main':
             raise RuntimeError('DECLARE statement only valid in top-level.')
 
-        _, _, name, params = ast.children
+        _, rtype, name, params = ast.children
         name = name.value
         param_types = []
         for p in params.children:
@@ -696,11 +727,18 @@ class Compiler:
             if param_types != defined_param_types:
                 raise RuntimeError('DECLARE statement does not match definition.')
 
-        if name in self.declared_subs:
-            if param_types != self.declared_subs[name]:
-                raise RuntimeError('Conflicting DECLARE statements.')
+        if rtype == 'sub':
+            if name in self.declared_subs:
+                if param_types != self.declared_subs[name]:
+                    raise RuntimeError('Conflicting DECLARE statements.')
+            else:
+                self.declared_subs[name] = param_types
         else:
-            self.declared_subs[name] = param_types
+            if name in self.declared_functions:
+                if param_types != self.declared_functions[name]:
+                    raise RuntimeError('Conflicting DECLARE statements.')
+            else:
+                self.declared_functions[name] = param_types
 
 
     def process_end_stmt(self, ast):
@@ -756,6 +794,9 @@ class Compiler:
     def process_sub_block(self, ast):
         _, name, params, body, _, _ = ast.children
 
+        if name[-1] in typespec_chars:
+            raise RuntimeError('Invalid SUB name.')
+
         saved_instrs = self.instrs
         self.instrs = []
         self.cur_routine = Routine(name.value, 'sub')
@@ -795,6 +836,69 @@ class Compiler:
 
         self.cur_routine = self.routines['__main']
         self.instrs = saved_instrs
+
+
+    def process_function_block(self, ast):
+        _, name, params, body, _, _ = ast.children
+
+        ftype = Type.from_var_name(name.value)
+
+        saved_instrs = self.instrs
+        self.instrs = []
+        self.cur_routine = Routine(name.value, 'function')
+
+        self.instrs += [Label(f'__function_{name}'),
+                        Instr('frame', name.value)]
+
+        for p in params.children:
+            if len(p.children) == 3:
+                # form: var AS type
+                pname, _, ptype = p.children
+                pname = pname.value
+                ptype = Type(ptype.children[0].value)
+            else:
+                # form: var$
+                pname = p.children[0].value
+                ptype = None
+
+            if any(pname == i.name for i in self.cur_routine.local_vars):
+                self.error('Duplicate parameter.')
+
+            var = Var(pname, self.cur_routine, type=ptype, is_param=True, status='dimmed', byref=True)
+
+        # create a variable with the same name as the function. this
+        # will be used for returning values.
+        Var(name, self.cur_routine, status='dimmed')
+
+        # mark the variable as used so that an index is allocated to
+        # it.
+        ret_var = Var(name, self.cur_routine, status='used')
+
+        # initialize the return variable.
+        if ftype.name == 'STRING':
+            self.instrs += [Instr(f'pushi$'), '""',
+                            Instr(f'writef4', ret_var)]
+        else:
+            self.instrs += [Instr(f'pushi{ftype.typespec}', '0'),
+                            Instr(f'writef{ftype.get_size()}', ret_var)]
+
+        if name in self.declared_functions:
+            defined_param_types = [v.type for v in self.cur_routine.params]
+            if defined_param_types != self.declared_functions[name]:
+                raise RuntimeError(
+                    'FUNCTION definition does not match previous DECLARE.')
+
+        self.routines[name.value] = self.cur_routine
+        self.compile_ast(body)
+
+        arg_size = sum(v.size for v in self.cur_routine.params)
+        self.instrs += [Instr('unframe_r', self.cur_routine.name, ret_var),
+                        Instr(f'ret_r', arg_size, ftype.get_size())]
+        self.cur_routine.instrs = self.instrs
+
+        self.cur_routine = self.routines['__main']
+        self.instrs = saved_instrs
+
 
 
     def process_next_stmt(self, ast):
@@ -944,6 +1048,14 @@ class Compiler:
             self.last_string_literal_idx += len(literal) + 2
 
 
+    def is_function(self, name):
+        return \
+            name in builtin_functions or \
+            name in self.declared_functions or \
+            any(name == r.name for r in self.routines.values()
+                if r.type == 'function')
+
+
 class Assembler:
     def __init__(self, compiler):
         self.compiler = compiler
@@ -1023,6 +1135,8 @@ class Assembler:
             'sgn&': (1, 0x47, self.assemble_one_byte),
             'sgn!': (1, 0x48, self.assemble_one_byte),
             'sgn#': (1, 0x49, self.assemble_one_byte),
+            'unframe_r': (7, 0x4a, self.assemble_unframe_r),
+            'ret_r': (5, 0x4b, self.assemble_ret_r),
         }
 
         # phase 1: calculate label addresses
@@ -1136,6 +1250,13 @@ class Assembler:
         return bytes([opcode]) + imm
 
 
+    def assemble_ret_r(self, instr, opcode, _, __):
+        instr, imm, imm2 = instr
+        imm = struct.pack('>H', imm)
+        imm2 = struct.pack('>H', imm2)
+        return bytes([opcode]) + imm + imm2
+
+
     def assemble_syscall(self, instr, opcode, _, __):
         instr, imm = instr
         imm = {
@@ -1151,6 +1272,21 @@ class Assembler:
         instr, routine = instr
         frame_size = sum(v.size for v in self.compiler.routines[routine].local_vars)
         return bytes([opcode]) + struct.pack('>H', frame_size)
+
+
+    def assemble_unframe_r(self, instr, opcode, _, __):
+        # the unframe_r instruction has three parameters actually:
+        # frame_size, return value index and return value
+        # size. however, in the code generated by the compiler only
+        # two parameters are set: the first is the function name from
+        # which frame size is extracted, the second is a Var object
+        # from which an index and a size is extracted.
+        instr, routine, var = instr
+        frame_size = sum(v.size for v in self.compiler.routines[routine].local_vars)
+        return bytes([opcode]) + \
+            struct.pack('>H', frame_size) + \
+            struct.pack('>h', var.idx) + \
+            struct.pack('>H', var.type.get_size())
 
 
     def assemble_writef(self, instr, opcode, _, __):

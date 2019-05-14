@@ -5,67 +5,22 @@ with open('qpybasic.ebnf') as f:
     grammar_text = f.read()
 
 prog = r"""
-start:
-x = 100:let y = 200
-z$ = "foo"
-z2$ = "bar"
-foo$ = z$ + z2$
+declare function fib%(n%)
 
-if x < y then
-    print "less"
-else
-    print "more"
-end if
-
-xyz: cls
-print
-10 print x; y; -(x + y*2), foo$
-print 1, 2, z
-
-for i = 1 to 10
-   print "boo"
+for i% = 1 to 10
+   print "fib("; i%; " ) ="; fib%(i%)
 next
 
-goto 10
-end
-"""
-prog = r"""
-sub foo(x as string, y as integer, z&)
-   print "sub_foo:"; z&
-   y = 190
-end sub
-
-sub bar(n as integer, r as long)
-   print n, r
-end sub
-
-foo "foobar", x%, 12000
-print "main:"; x%
-"""
-
-prog = r"""
-declare sub fib(n as integer, r&)
-
-sub fib(n as integer, r as long)
-   if n <= 2 then
-      r = 1
+function fib%(n%)
+   if n% < 3 then
+      fib% = 1
    else
-      fib n-1, r1&
-      fib n-2, r2&
-      r = r1& + r2&
+      x1% = fib%(n%-1)
+      x2% = fib%(n%-2)
+      fib% = x1% + x2%
    end if
-end sub
+end function
 
-for i% = 1 to 10 step 1
-   fib i%, r&
-   print "fib", i%, r&
-next
-"""
-
-xprog = r"""
-if 1 then
-   print 100
-end if
 """
 
 c = Compiler()

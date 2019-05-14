@@ -18,6 +18,7 @@ _nl: _NEWLINE _nl
       | if_block
 
 ?toplevel_block: sub_block
+               | function_block
 
 _line: [label | lineno] _stmt_group
 
@@ -63,6 +64,8 @@ typename: INTEGER_KW
         | DOUBLE_KW
         | STRING_KW
 
+function_block: FUNCTION_KW TYPED_ID parameter_list _NEWLINE block_body END_KW FUNCTION_KW
+
 block_body: _block_body_item*
 
 _block_body_item: block _NEWLINE
@@ -77,7 +80,7 @@ argument_list: expr ("," expr)*
 
 cls_stmt: CLS_KW
 
-declare_stmt: DECLARE_KW SUB_KW TYPED_ID parameter_list
+declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) TYPED_ID parameter_list
 
 end_stmt: END_CMD
 
@@ -142,6 +145,7 @@ ELSE_KW: "else"i
 ELSEIF_KW: "elseif"i
 END_KW: "end"i
 FOR_KW: "for"i
+FUNCTION_KW: "function"i
 GOTO_KW: "goto"i
 IF_KW: "if"i
 INTEGER_KW: "integer"i
