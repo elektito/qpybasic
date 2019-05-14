@@ -12,6 +12,11 @@ FALSE = struct.pack('>h', 0)
 logger = logging.getLogger(__name__)
 
 
+class Jump:
+    def __init__(self, target):
+        self.target = target
+
+
 class Machine:
     def __init__(self, mem):
         self.mem = mem
@@ -64,7 +69,13 @@ class Machine:
                 0x46: 'sgn_integer',
             }[opcode]
             n = getattr(self, f'exec_{opname}')()
-            self.ip += n + 1
+            if isinstance(n, Jump):
+                # return value is an absolute jump.
+                self.ip = n.target
+            else:
+                # return value is the number of bytes used from the
+                # instruction stream by the exec function.
+                self.ip += n + 1
 
 
     def exec_add_integer(self):
@@ -112,7 +123,7 @@ class Machine:
         target, = struct.unpack('>I', target)
         self.push(struct.pack('>I', self.ip + 5))
         logger.debug('EXEC: call')
-        return target - self.ip - 1
+        return Jump(target)
 
 
     def exec_conv_int_long(self):
@@ -194,7 +205,7 @@ class Machine:
     def exec_jmp(self):
         target = self.mem.read(4)
         target, = struct.unpack('>I', target)
-        return target - self.ip - 1
+        return Jump(target)
 
 
     def exec_jmpf(self):
@@ -209,12 +220,7 @@ class Machine:
             return 2
         else:
             # FALSE
-
-            # relative jumps are calculated based on the address of
-            # the jump instruction itself. the -1 we add is so that we
-            # offset the size of the opcode which is automatically
-            # added to IP upon return.
-            return -1 + offset
+            return Jump(self.ip + offset)
 
 
     def exec_jmpt(self):
@@ -226,12 +232,7 @@ class Machine:
         logger.debug('EXEC: jmpt')
         if cond != 0:
             # TRUE
-
-            # relative jumps are calculated based on the address of
-            # the jump instruction itself. the -1 we add is so that we
-            # offset the size of the opcode which is automatically
-            # added to IP upon return.
-            return -1 + offset
+            return Jump(self.ip + offset)
         else:
             # FALSE
             return 2
@@ -354,7 +355,7 @@ class Machine:
         target, = struct.unpack('>I', self.pop(4))
         self.sp -= arg_size
         logger.debug('EXEC: ret')
-        return target - self.ip - 1
+        return Jump(target)
 
 
     def exec_sgn_integer(self):
