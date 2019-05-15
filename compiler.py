@@ -421,7 +421,10 @@ class Expr:
                     self.instrs += [Instr('pushfp', v)]
                 else:
                     e = Expr(a, self.parent)
-                    typespec = self.parent.routines[fname].params[i].type.typespec
+                    if fname in self.parent.routines:
+                        typespec = self.parent.routines[fname].params[i].type.typespec
+                    else:
+                        typespec = self.parent.declared_functions[fname][i].typespec
                     v = Var(self.parent.gen_var('rvalue', typespec), self.parent.cur_routine)
                     self.parent.gen_set_var_code(v, e)
                     self.instrs += [Instr('pushfp', v)]
