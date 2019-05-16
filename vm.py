@@ -23,61 +23,66 @@ class Machine:
         self.sp = 0xffffffff
         self.fp = self.sp
         self.ip = 0x100000
+        self.stopped = False
 
 
     def launch(self):
         self.stopped = False
         while not self.stopped:
-            self.mem.seek(self.ip)
-            opcode = self.mem.read_byte()
-            opname = {
-                0x01: 'add_integer',
-                0x02: 'add_long',
-                0x03: 'add_single',
-                0x05: 'call',
-                0x06: 'conv_int_long',
-                0x07: 'conv_int_single',
-                0x0c: 'conv_single_int',
-                0x13: 'end',
-                0x14: 'frame',
-                0x17: 'gt',
-                0x1b: 'le',
-                0x18: 'jmp',
-                0x19: 'jmpf',
-                0x1a: 'jmpt',
-                0x1c: 'lt',
-                0x1f: 'mul_single',
-                0x22: 'neg_int',
-                0x24: 'neg_single',
-                0x26: 'pushi_int',
-                0x28: 'pushi_single',
-                0x2a: 'pushi_string',
-                0x2c: 'readf2',
-                0x2d: 'readf4',
-                0x2e: 'sub_int',
-                0x30: 'sub_single',
-                0x32: 'syscall',
-                0x34: 'writef2',
-                0x35: 'writef4',
-                0x37: 'ret',
-                0x38: 'unframe',
-                0x3b: 'readi2',
-                0x3c: 'readi4',
-                0x40: 'writei4',
-                0x42: 'pushfp',
-                0x44: 'dup2',
-                0x46: 'sgn_integer',
-                0x4a: 'unframe_r',
-                0x4b: 'ret_r',
-            }[opcode]
-            n = getattr(self, f'exec_{opname}')()
-            if isinstance(n, Jump):
-                # return value is an absolute jump.
-                self.ip = n.target
-            else:
-                # return value is the number of bytes used from the
-                # instruction stream by the exec function.
-                self.ip += n + 1
+            self.step()
+
+
+    def step(self):
+        self.mem.seek(self.ip)
+        opcode = self.mem.read_byte()
+        opname = {
+            0x01: 'add_integer',
+            0x02: 'add_long',
+            0x03: 'add_single',
+            0x05: 'call',
+            0x06: 'conv_int_long',
+            0x07: 'conv_int_single',
+            0x0c: 'conv_single_int',
+            0x13: 'end',
+            0x14: 'frame',
+            0x17: 'gt',
+            0x1b: 'le',
+            0x18: 'jmp',
+            0x19: 'jmpf',
+            0x1a: 'jmpt',
+            0x1c: 'lt',
+            0x1f: 'mul_single',
+            0x22: 'neg_int',
+            0x24: 'neg_single',
+            0x26: 'pushi_int',
+            0x28: 'pushi_single',
+            0x2a: 'pushi_string',
+            0x2c: 'readf2',
+            0x2d: 'readf4',
+            0x2e: 'sub_int',
+            0x30: 'sub_single',
+            0x32: 'syscall',
+            0x34: 'writef2',
+            0x35: 'writef4',
+            0x37: 'ret',
+            0x38: 'unframe',
+            0x3b: 'readi2',
+            0x3c: 'readi4',
+            0x40: 'writei4',
+            0x42: 'pushfp',
+            0x44: 'dup2',
+            0x46: 'sgn_integer',
+            0x4a: 'unframe_r',
+            0x4b: 'ret_r',
+        }[opcode]
+        n = getattr(self, f'exec_{opname}')()
+        if isinstance(n, Jump):
+            # return value is an absolute jump.
+            self.ip = n.target
+        else:
+            # return value is the number of bytes used from the
+            # instruction stream by the exec function.
+            self.ip += n + 1
 
 
     def exec_add_integer(self):
