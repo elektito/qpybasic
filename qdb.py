@@ -1,6 +1,7 @@
 import cmd
 import struct
 import vm
+import asm
 from mmap import mmap
 
 
@@ -33,100 +34,25 @@ Type help or ? to list commands.
         self.machine.mem.seek(self.machine.ip)
         opcode = self.machine.mem.read_byte()
         instruction = asm.opcode_to_instr[opcode]
+        bin_fmt = ''.join(o.bin_fmt for o in instruction.operands)
+        text_fmt = [o.text_fmt for o in instruction.operands]
 
-        name, extra_bytes, bin_fmt, text_fmt = {
-            0x01: ('add%', 0, '', ''),
-            0x02: ('add&', 0, '', ''),
-            0x03: ('add!', 0, '', ''),
-            0x04: ('add#', 0, '', ''),
-            0x05: ('call', 4, 'I', 'h4'),
-            0x06: ('conv%&', 0, '', ''),
-            0x07: ('conv%!', 0, '', ''),
-            0x08: ('conv%#', 0, '', ''),
-            0x09: ('conv&%', 0, '', ''),
-            0x0a: ('conv&!', 0, '', ''),
-            0x0b: ('conv&#', 0, '', ''),
-            0x0c: ('conv!%', 0, '', ''),
-            0x0d: ('conv!&', 0, '', ''),
-            0x0e: ('conv!#', 0, '', ''),
-            0x0f: ('conv#%', 0, '', ''),
-            0x10: ('conv#&', 0, '', ''),
-            0x12: ('conv#!', 0, '', ''),
-            0x13: ('end', 0, '', ''),
-            0x14: ('frame', 2, 'H', 'i'),
-            0x15: ('eq', 0, '', ''),
-            0x16: ('ge', 0, '', ''),
-            0x17: ('gt', 0, '', ''),
-            0x18: ('jmp', 4, 'I', 'h4'),
-            0x19: ('jmpf', 2, 'h', 'i'),
-            0x1a: ('jmpt', 2, 'h', 'i'),
-            0x1b: ('le', 0, '', ''),
-            0x1c: ('lt', 0, '', ''),
-            0x1d: ('mul%', 0, '', ''),
-            0x1e: ('mul&', 0, '', ''),
-            0x1f: ('mul!', 0, '', ''),
-            0x20: ('mul#', 0, '', ''),
-            0x21: ('ne', 0, '', ''),
-            0x22: ('neg%', 0, '', ''),
-            0x23: ('neg&', 0, '', ''),
-            0x24: ('neg!', 0, '', ''),
-            0x25: ('neg#', 0, '', ''),
-            0x26: ('pushi%', 2, 'h', 'i'),
-            0x27: ('pushi&', 2, 'i', 'i'),
-            0x28: ('pushi!', 2, 'f', 'f'),
-            0x29: ('pushi#', 8, 'd', 'f'),
-            0x2a: ('pushi$', 4, 'I', 'h4'),
-            0x2b: ('readf1', 2, 'h', 'i'),
-            0x2c: ('readf2', 2, 'h', 'i'),
-            0x2d: ('readf4', 2, 'h', 'i'),
-            0x2e: ('sub%', 0, '', ''),
-            0x2f: ('sub&', 0, '', ''),
-            0x30: ('sub!', 0, '', ''),
-            0x31: ('sub#', 0, '', ''),
-            0x32: ('syscall', 2, 'H', 'i'),
-            0x33: ('writef1', 2, 'h', 'i'),
-            0x34: ('writef2', 2, 'h', 'i'),
-            0x35: ('writef4', 2, 'h', 'i'),
-            0x36: ('writef8', 2, 'h', 'i'),
-            0x37: ('ret', 2, 'H', 'i'),
-            0x38: ('unframe', 2, 'H', 'i'),
-            0x39: ('readf8', 2, 'h', 'i'),
-            0x3a: ('readi1', 0, '', ''),
-            0x3b: ('readi2', 0, '', ''),
-            0x3c: ('readi4', 0, '', ''),
-            0x3d: ('readi8', 0, '', ''),
-            0x3e: ('writei1', 0, '', ''),
-            0x3f: ('writei2', 0, '', ''),
-            0x40: ('writei4', 0, '', ''),
-            0x41: ('writei8', 0, '', ''),
-            0x42: ('pushfp', 2, 'h', 'i'),
-            0x43: ('dup1', 0, '', ''),
-            0x44: ('dup2', 0, '', ''),
-            0x45: ('dup4', 0, '', ''),
-            0x46: ('sgn%', 0, '', ''),
-            0x47: ('sgn&', 0, '', ''),
-            0x48: ('sgn!', 0, '', ''),
-            0x49: ('sgn#', 0, '', ''),
-            0x4a: ('unframe_r', 6, 'HhH', 'i i i'),
-            0x4b: ('ret_r', 4, 'HH', 'i i'),
-        }[opcode]
-        args = self.machine.mem.read(extra_bytes)
-        instr = self.format_instr(name, args, bin_fmt, text_fmt)
+        args = self.machine.mem.read(instruction.size - 1)
+        instr = self.format_instr(instruction.name, args, bin_fmt, text_fmt)
         print(f'NEXT UP: {instr}')
 
 
     def format_instr(self, name, args, bin_fmt, text_fmt):
         args = struct.unpack('>' + bin_fmt, args)
-        text_fmt = text_fmt.split()
         assert len(args) == len(text_fmt)
         fargs = []
         for arg, fmt in zip(args, text_fmt):
-            if fmt in ['h1', 'h2', 'h4']:
+            if fmt in ['hex1', 'hex2', 'hex4']:
                 n = int(fmt[-1]) * 2 + 2 # two digits per byte plus two more for 0x
                 farg = f'{arg:#0{n}x}'
-            elif fmt == 'f':
+            elif fmt == 'float':
                 farg = str(arg)
-            elif fmt == 'i':
+            elif fmt == 'decimal':
                 farg = str(arg)
             else:
                 assert False, f'Unknown arg format: {fmt}'
