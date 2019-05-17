@@ -25,9 +25,9 @@ _line: [label | lineno] _stmt_group
 _stmt_group: (stmt ":") _stmt_group
            | stmt?
 
-label: ID ":"
+label: TYPED_ID ":"
 
-lineno: INT_LITERAL
+lineno: NUMERIC_LITERAL
 
 ?stmt: call_stmt
      | cls_stmt
@@ -84,7 +84,7 @@ declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) TYPED_ID parameter_list
 
 end_stmt: END_CMD
 
-goto_stmt: GOTO_KW (ID | INT_LITERAL)
+goto_stmt: GOTO_KW (TYPED_ID | NUMERIC_LITERAL)
 
 let_stmt: LET_KW? TYPED_ID "=" expr
 

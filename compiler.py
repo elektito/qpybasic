@@ -907,7 +907,7 @@ class Compiler:
 
     def process_goto_stmt(self, ast):
         _, target = ast.children
-        if target.type == 'ID':
+        if target.type == 'TYPED_ID':
             self.instrs += [Instr('jmp', target)]
         else:
             self.instrs += [Instr('jmp', f'__lineno_{target.value}')]
