@@ -1,6 +1,7 @@
 import struct
 from collections import OrderedDict
 from lark import Lark, Token, Tree
+from asm import Instr
 
 
 # This is the address programs are loaded, right after where
@@ -97,17 +98,6 @@ def builtin_func_abs(parent, args):
 builtin_functions = {
     'abs': builtin_func_abs,
 }
-
-
-class Instr(tuple):
-    def __new__(cls, *args):
-        return super(Instr, cls).__new__(cls, tuple(args))
-
-    def __repr__(self):
-        return '<Instr {}>'.format(super().__repr__())
-
-    def __str__(self):
-        return '\t' + self[0] + '\t' + ', '.join(str(i) for i in self[1:])
 
 
 class Type:
@@ -404,7 +394,6 @@ class Expr:
         else:
             if fname not in self.parent.routines and \
                fname not in self.parent.declared_functions:
-                print('bb', self.parent.declared_functions)
                 raise RuntimeError(f'No such function: {fname}')
 
             i = len(args) - 1
@@ -446,12 +435,15 @@ class Expr:
                 self.type = var.type
         elif v.type == 'STRING_LITERAL':
             self.parent.add_string_literal(v[1:-1])
-            t = get_literal_type(v.value)
-            self.instrs += [Instr('pushi' + t.typespec, v.value)]
+            self.instrs += [Instr('pushi$', v.value)]
             self.type = t
         elif v.type == 'NUMERIC_LITERAL':
             t = get_literal_type(v.value)
-            self.instrs += [Instr('pushi' + t.typespec, v.value)]
+            if t.name.lower() in ['integer', 'long']:
+                value = int(v.value)
+            else:
+                value = float(v.value)
+            self.instrs += [Instr('pushi' + t.typespec, value)]
             self.type = t
         else:
             assert False, 'This should not have happened.'
@@ -507,6 +499,7 @@ class Expr:
 
 class Label:
     def __init__(self, value):
+        assert isinstance(value, str)
         self.value = value
 
 
@@ -633,12 +626,12 @@ class Compiler:
                        Instr('call', '__main'),
                        Instr('end'),
                        Label('__main'),
-                       Instr('frame', '__main')]
+                       Instr('frame', self.routines['__main'])]
 
         ast = self.parser.parse(code)
         self.compile_ast(ast)
 
-        self.instrs += [Instr('unframe', '__main'),
+        self.instrs += [Instr('unframe', self.routines['__main']),
                         Instr('ret', 0)]
         self.instrs += sum((r.instrs for r in self.routines.values()), [])
 
@@ -805,7 +798,7 @@ class Compiler:
         self.cur_routine = Routine(name.value, 'sub')
 
         self.instrs += [Label(f'__sub_{name}'),
-                        Instr('frame', name.value)]
+                        Instr('frame', self.cur_routine)]
 
         for p in params.children:
             if len(p.children) == 3:
@@ -845,13 +838,14 @@ class Compiler:
         _, name, params, body, _, _ = ast.children
 
         ftype = Type.from_var_name(name.value)
+        name = name.value
 
         saved_instrs = self.instrs
         self.instrs = []
-        self.cur_routine = Routine(name.value, 'function')
+        self.cur_routine = Routine(name, 'function')
 
         self.instrs += [Label(f'__function_{name}'),
-                        Instr('frame', name.value)]
+                        Instr('frame', self.cur_routine)]
 
         for p in params.children:
             if len(p.children) == 3:
@@ -882,7 +876,7 @@ class Compiler:
             self.instrs += [Instr(f'pushi$'), '""',
                             Instr(f'writef4', ret_var)]
         else:
-            self.instrs += [Instr(f'pushi{ftype.typespec}', '0'),
+            self.instrs += [Instr(f'pushi{ftype.typespec}', 0),
                             Instr(f'writef{ftype.get_size()}', ret_var)]
 
         if name in self.declared_functions:
@@ -891,11 +885,11 @@ class Compiler:
                 raise RuntimeError(
                     'FUNCTION definition does not match previous DECLARE.')
 
-        self.routines[name.value] = self.cur_routine
+        self.routines[name] = self.cur_routine
         self.compile_ast(body)
 
         arg_size = sum(v.size for v in self.cur_routine.params)
-        self.instrs += [Instr('unframe_r', self.cur_routine.name, ret_var),
+        self.instrs += [Instr('unframe_r', self.cur_routine, ret_var),
                         Instr(f'ret_r', arg_size, ftype.get_size())]
         self.cur_routine.instrs = self.instrs
 
@@ -1065,240 +1059,73 @@ class Assembler:
 
 
     def assemble(self, instrs):
-        all_instrs = {
-            'add%': (1, 0x01, self.assemble_one_byte),
-            'add&': (1, 0x02, self.assemble_one_byte),
-            'add!': (1, 0x03, self.assemble_one_byte),
-            'add#': (1, 0x04, self.assemble_one_byte),
-            'call': (5, 0x05, self.assemble_call),
-            'conv%&': (1, 0x06, self.assemble_one_byte),
-            'conv%!': (1, 0x07, self.assemble_one_byte),
-            'conv%#': (1, 0x08, self.assemble_one_byte),
-            'conv&%': (1, 0x09, self.assemble_one_byte),
-            'conv&!': (1, 0x0a, self.assemble_one_byte),
-            'conv&#': (1, 0x0b, self.assemble_one_byte),
-            'conv!%': (1, 0x0c, self.assemble_one_byte),
-            'conv!&': (1, 0x0d, self.assemble_one_byte),
-            'conv!#': (1, 0x0e, self.assemble_one_byte),
-            'conv#%': (1, 0x0f, self.assemble_one_byte),
-            'conv#&': (1, 0x10, self.assemble_one_byte),
-            'conv#!': (1, 0x12, self.assemble_one_byte),
-            'end': (1, 0x13, self.assemble_one_byte),
-            'frame': (3, 0x14, self.assemble_frame),
-            'eq': (1, 0x15, self.assemble_one_byte),
-            'ge': (1, 0x16, self.assemble_one_byte),
-            'gt': (1, 0x17, self.assemble_one_byte),
-            'jmp': (5, 0x18, self.assemble_jmp),
-            'jmpf': (3, 0x19, self.assemble_jmp_c),
-            'jmpt': (3, 0x1a, self.assemble_jmp_c),
-            'le': (1, 0x1b, self.assemble_one_byte),
-            'lt': (1, 0x1c, self.assemble_one_byte),
-            'mul%': (1, 0x1d, self.assemble_one_byte),
-            'mul&': (1, 0x1e, self.assemble_one_byte),
-            'mul!': (1, 0x1f, self.assemble_one_byte),
-            'mul#': (1, 0x20, self.assemble_one_byte),
-            'ne': (1, 0x21, self.assemble_one_byte),
-            'neg%': (1, 0x22, self.assemble_one_byte),
-            'neg&': (1, 0x23, self.assemble_one_byte),
-            'neg!': (1, 0x24, self.assemble_one_byte),
-            'neg#': (1, 0x25, self.assemble_one_byte),
-            'pushi%': (3, 0x26, self.assemble_pushi),
-            'pushi&': (5, 0x27, self.assemble_pushi),
-            'pushi!': (5, 0x28, self.assemble_pushi),
-            'pushi#': (9, 0x29, self.assemble_pushi),
-            'pushi$': (5, 0x2a, self.assemble_pushi),
-            'readf1': (3, 0x2b, self.assemble_readf),
-            'readf2': (3, 0x2c, self.assemble_readf),
-            'readf4': (3, 0x2d, self.assemble_readf),
-            'sub%': (1, 0x2e, self.assemble_one_byte),
-            'sub&': (1, 0x2f, self.assemble_one_byte),
-            'sub!': (1, 0x30, self.assemble_one_byte),
-            'sub#': (1, 0x31, self.assemble_one_byte),
-            'syscall': (3, 0x32, self.assemble_syscall),
-            'writef1': (3, 0x33, self.assemble_writef),
-            'writef2': (3, 0x34, self.assemble_writef),
-            'writef4': (3, 0x35, self.assemble_writef),
-            'writef8': (3, 0x36, self.assemble_writef),
-            'ret': (3, 0x37, self.assemble_ret),
-            'unframe': (3, 0x38, self.assemble_unframe),
-            'readf8': (3, 0x39, self.assemble_readf),
-            'readi1': (1, 0x3a, self.assemble_one_byte),
-            'readi2': (1, 0x3b, self.assemble_one_byte),
-            'readi4': (1, 0x3c, self.assemble_one_byte),
-            'readi8': (1, 0x3d, self.assemble_one_byte),
-            'writei1': (1, 0x3e, self.assemble_one_byte),
-            'writei2': (1, 0x3f, self.assemble_one_byte),
-            'writei4': (1, 0x40, self.assemble_one_byte),
-            'writei8': (1, 0x41, self.assemble_one_byte),
-            'pushfp': (3, 0x42, self.assemble_pushfp),
-            'dup1': (1, 0x43, self.assemble_one_byte),
-            'dup2': (1, 0x44, self.assemble_one_byte),
-            'dup4': (1, 0x45, self.assemble_one_byte),
-            'sgn%': (1, 0x46, self.assemble_one_byte),
-            'sgn&': (1, 0x47, self.assemble_one_byte),
-            'sgn!': (1, 0x48, self.assemble_one_byte),
-            'sgn#': (1, 0x49, self.assemble_one_byte),
-            'unframe_r': (7, 0x4a, self.assemble_unframe_r),
-            'ret_r': (5, 0x4b, self.assemble_ret_r),
-        }
+        labels = {}
+        p = 0
+        def resolver(instr):
+            def fix_label(label):
+                if label[-1] in typespec_chars:
+                    return label[:-1]
+                else:
+                    return label
+
+            operands = []
+            if instr.name in ['jmpf', 'jmpt']:
+                operands = [labels[fix_label(instr.operands[0])] - INITIAL_ADDR - p]
+            elif instr.name == 'jmp':
+                operands = [labels[fix_label(instr.operands[0])]]
+            elif instr.name == 'call':
+                operands = [labels[fix_label(instr.operands[0])]]
+            elif instr.name == 'unframe_r':
+                routine, var = instr.operands
+                frame_size = sum(v.size for v in routine.local_vars)
+                operands = [frame_size, var.idx, var.type.get_size()]
+            elif instr.name in ['frame', 'unframe']:
+                frame_size = sum(v.size for v in instr.operands[0].local_vars)
+                operands = [frame_size]
+            elif instr.name == 'syscall':
+                call_code = {
+                    '__cls': 0x02,
+                    '__concat': 0x03,
+                    '__print': 0x04,
+                }[instr.operands[0]]
+                operands = [call_code]
+            else:
+                for o in instr.operands:
+                    if isinstance(o, Label):
+                        o = labels[fix_label(o)]
+                    elif isinstance(o, Var):
+                        o = o.idx
+                    operands.append(o)
+
+            return operands
 
         # phase 1: calculate label addresses
-        p = 0
-        labels = {}
         for i in instrs:
             if isinstance(i, Label):
-                labels[i.value] = INITIAL_ADDR + p
+                if i.value[-1] in typespec_chars:
+                    labels[i.value[:-1]] = INITIAL_ADDR + p
+                else:
+                    labels[i.value] = INITIAL_ADDR + p
             else:
-                size, _, _ = all_instrs[i[0]]
-                p += size
+                p += i.size
 
         # phase 2: assemble
-        p = 0
         code = b''
+        p = 0
         for i in instrs:
             if not isinstance(i, Instr):
                 continue
 
-            size, opcode, assemble = all_instrs[i[0]]
-            c = assemble(i, opcode, p, labels)
+            for operand in i.operands:
+                if isinstance(operand, Label):
+                    if operand.value[-1] in typespec_chars:
+                        v = operand.value[:-1]
+                    else:
+                        v = operand.value
+                    operand.address = labels[v]
 
-            assert len(c) == size
+            c = i.assemble(resolver)
             p += len(c)
             code += c
 
         return code
-
-
-    def assemble_one_byte(self, instr, opcode, p, _):
-        return bytes([opcode])
-
-
-    def assemble_call(self, instr, opcode, p, labels):
-        instr, dest = instr
-        dest = struct.pack('>I', labels[dest])
-        return bytes([opcode]) + dest
-
-
-    def assemble_frame(self, instr, opcode, _, __):
-        instr, routine = instr
-        frame_size = sum(v.size for v in self.compiler.routines[routine].local_vars)
-        return bytes([opcode]) + struct.pack('>H', frame_size)
-
-
-    def assemble_jmp(self, instr, opcode, p, labels):
-        instr, dest = instr
-        dest = struct.pack('>I', labels[dest])
-        return bytes([opcode]) + dest
-
-
-    def assemble_jmp_c(self, instr, opcode, p, labels):
-        instr, dest = instr
-        diff = labels[dest] - INITIAL_ADDR - p
-        if diff < -32768 or diff >32767:
-            raise RuntimeError('Conditional jump too long.')
-        dest = struct.pack('>h', diff)
-        return bytes([opcode]) + dest
-
-
-    def assemble_pushi(self, instr, opcode, _, __):
-        instr, imm = instr
-        t = instr[-1]
-
-        if isinstance(imm, str):
-            if t != '$' and imm[-1] in '%&!#':
-                imm = imm[:-1]
-
-            if t == '$':
-                imm = STRING_ADDR + self.compiler.string_literals[imm[1:-1]]
-            elif t in '!#':
-                imm = float(imm)
-            else:
-                imm = int(imm)
-
-        if t == '%':
-            imm = struct.pack('>h', imm)
-        elif t == '&':
-            imm = struct.pack('>i', imm)
-        elif t == '!':
-            imm = struct.pack('>f', imm)
-        elif t == '#':
-            imm = struct.pack('>d', imm)
-        elif t == '$':
-            imm = struct.pack('>I', imm)
-        else:
-            raise RuntimeError('Invalid value.')
-
-        return bytes([opcode]) + imm
-
-
-    def assemble_pushfp(self, instr, opcode, _, __):
-        instr, imm  = instr
-        if isinstance(imm, Var):
-            imm = imm.idx
-        imm = struct.pack('>h', imm)
-        return bytes([opcode]) + imm
-
-
-    def assemble_readf(self, instr, opcode, _, __):
-        instr, imm = instr
-        if isinstance(imm, Var):
-            imm = imm.idx
-        imm = struct.pack('>h', imm)
-        return bytes([opcode]) + imm
-
-
-    def assemble_ret(self, instr, opcode, _, __):
-        instr, imm = instr
-        imm = struct.pack('>H', imm)
-        return bytes([opcode]) + imm
-
-
-    def assemble_ret_r(self, instr, opcode, _, __):
-        instr, imm, imm2 = instr
-        imm = struct.pack('>H', imm)
-        imm2 = struct.pack('>H', imm2)
-        return bytes([opcode]) + imm + imm2
-
-
-    def assemble_syscall(self, instr, opcode, _, __):
-        instr, imm = instr
-        imm = {
-            '__cls': 0x02,
-            '__concat': 0x03,
-            '__print': 0x04,
-        }[imm]
-        imm = struct.pack('>H', imm)
-        return bytes([opcode]) + imm
-
-
-    def assemble_unframe(self, instr, opcode, _, __):
-        instr, routine = instr
-        frame_size = sum(v.size for v in self.compiler.routines[routine].local_vars)
-        return bytes([opcode]) + struct.pack('>H', frame_size)
-
-
-    def assemble_unframe_r(self, instr, opcode, _, __):
-        # the unframe_r instruction has three parameters actually:
-        # frame_size, return value index and return value
-        # size. however, in the code generated by the compiler only
-        # two parameters are set: the first is the function name from
-        # which frame size is extracted, the second is a Var object
-        # from which an index and a size is extracted.
-        instr, routine, var = instr
-        frame_size = sum(v.size for v in self.compiler.routines[routine].local_vars)
-        return bytes([opcode]) + \
-            struct.pack('>H', frame_size) + \
-            struct.pack('>h', var.idx) + \
-            struct.pack('>H', var.type.get_size())
-
-
-    def assemble_writef(self, instr, opcode, _, __):
-        instr, imm = instr
-        if isinstance(imm, Var):
-            imm = imm.idx
-        imm = struct.pack('>h', imm)
-        return bytes([opcode]) + imm
-
-
-    def get_str_literal_idx(self, literal):
-        pass
