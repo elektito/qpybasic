@@ -306,7 +306,12 @@ class Routine:
 
 
     def __repr__(self):
-        return f'<{self.type.upper()} {self.name} {self.params}>'
+        routine_type = self.type.upper()
+        if hasattr(self, 'ret_type'):
+            ret_type = self.ret_type.name
+            return f'<{routine_type} {self.name} {self.params} ret={ret_type}>'
+        else:
+            return f'<{self.type.upper()} {self.name} {self.params}>'
 
 
 class Expr:
