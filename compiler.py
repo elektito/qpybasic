@@ -388,13 +388,30 @@ class Expr:
             fname, = ast.children
             args = []
         fname = fname.lower()
+        if fname[-1] in typespec_chars:
+            called_type = Type.from_var_name(fname)
+            fname = fname[:-1]
+        else:
+            called_type = None
+
         if fname in builtin_functions:
             f = builtin_functions[fname]
             self.type, self.instrs = f(self.parent, args)
+            if called_type and self.type != called_type:
+                raise RuntimeError('Function return type mismatch.')
         else:
-            if fname not in self.parent.routines and \
-               fname not in self.parent.declared_functions:
+            if fname in self.parent.routines:
+                self.type = self.parent.routines[fname].ret_type
+            elif fname in self.parent.declared_routines:
+                r = self.parent.declared_routines[fname]
+                if r.type == 'sub':
+                    raise RuntimeError('SUB cannot be called as a function.')
+                self.type = r.ret_type
+            else:
                 raise RuntimeError(f'No such function: {fname}')
+
+            if called_type and self.type != called_type:
+                raise RuntimeError('Function return type mismatch.')
 
             i = len(args) - 1
             for a in reversed(args):
@@ -405,7 +422,7 @@ class Expr:
                         if v.type != self.parent.routines[fname].params[i].type:
                             raise RuntimeError('Parameter type mismatch.')
                     else:
-                        if v.type != self.parent.declared_functions[fname][i]:
+                        if v.type != self.parent.declared_routines[fname].param_types[i]:
                             raise RuntimeError('Parameter type mismatch.')
                     self.instrs += [Instr('pushfp', v)]
                 else:
@@ -413,7 +430,7 @@ class Expr:
                     if fname in self.parent.routines:
                         typespec = self.parent.routines[fname].params[i].type.typespec
                     else:
-                        typespec = self.parent.declared_functions[fname][i].typespec
+                        typespec = self.parent.declared_routines[fname].param_types[i].typespec
                     v = Var(self.parent.gen_var('rvalue', typespec), self.parent.cur_routine)
                     self.parent.gen_set_var_code(v, e)
                     self.instrs += [Instr('pushfp', v)]
@@ -421,7 +438,6 @@ class Expr:
                 i -= 1
 
             self.instrs += [Instr('call', f'__function_{fname}')]
-            self.type = Type.from_var_name(fname)
 
 
     def process_value(self, ast):
@@ -582,6 +598,14 @@ class PostLex:
             prev_tok = tok
 
 
+class DeclaredRoutine:
+    def __init__(self, type, name, param_types, ret_type=None):
+        self.type = type
+        self.name = name
+        self.param_types = param_types
+        self.ret_type = ret_type
+
+
 class Compiler:
     def __init__(self):
         with open('qpybasic.ebnf') as f:
@@ -605,10 +629,10 @@ class Compiler:
         self.string_literals = {}
         self.last_string_literal_idx = 0
 
-        # map the names of declared subs/functions to a list of types,
-        # which are the types of the parameters each receives.
-        self.declared_subs = {}
-        self.declared_functions = {}
+        # map the names of declared subs/functions to a
+        # DeclaredRoutine object which contains parameter types and
+        # possibly return value.
+        self.declared_routines = {}
 
         # add string literals used by the compiler
         self.add_string_literal(';')
@@ -702,8 +726,20 @@ class Compiler:
         if self.cur_routine.name != '__main':
             raise RuntimeError('DECLARE statement only valid in top-level.')
 
-        _, rtype, name, params = ast.children
+        _, routine_type, name, params = ast.children
         name = name.value
+        if name[-1] in typespec_chars:
+            if routine_type == 'sub':
+                raise RuntimeError('Invalid SUB name.')
+            else:
+                ret_type = Type.from_var_name(name)
+                name = name[:-1]
+        else:
+            if routine_type == 'sub':
+                ret_type = None
+            else:
+                ret_type = Type.from_var_name(name)
+
         param_types = []
         for p in params.children:
             if len(p.children) == 3:
@@ -723,18 +759,14 @@ class Compiler:
             if param_types != defined_param_types:
                 raise RuntimeError('DECLARE statement does not match definition.')
 
-        if rtype == 'sub':
-            if name in self.declared_subs:
-                if param_types != self.declared_subs[name]:
-                    raise RuntimeError('Conflicting DECLARE statements.')
-            else:
-                self.declared_subs[name] = param_types
+        if name in self.declared_routines:
+            if self.declared_routines[name].type != routine_type or \
+               self.declared_routines[name].ret_type != ret_type or \
+               self.declared_routines[name].param_types != param_types:
+                raise RuntimeError('Conflicting DECLARE statements.')
         else:
-            if name in self.declared_functions:
-                if param_types != self.declared_functions[name]:
-                    raise RuntimeError('Conflicting DECLARE statements.')
-            else:
-                self.declared_functions[name] = param_types
+            dr = DeclaredRoutine(routine_type, name, param_types, ret_type)
+            self.declared_routines[name] = dr
 
 
     def process_end_stmt(self, ast):
@@ -816,9 +848,11 @@ class Compiler:
 
             var = Var(pname, self.cur_routine, type=ptype, is_param=True, status='dimmed', byref=True)
 
-        if name in self.declared_subs:
+        if name in self.declared_routines:
             defined_param_types = [v.type for v in self.cur_routine.params]
-            if defined_param_types != self.declared_subs[name]:
+            r = self.declared_routines[name]
+            if r.type != 'sub' or \
+               defined_param_types != r.param_types:
                 raise RuntimeError(
                     'SUB definition does not match previous DECLARE.')
 
@@ -839,10 +873,13 @@ class Compiler:
 
         ftype = Type.from_var_name(name.value)
         name = name.value
+        if name[-1] in typespec_chars:
+            name = name[:-1]
 
         saved_instrs = self.instrs
         self.instrs = []
         self.cur_routine = Routine(name, 'function')
+        self.cur_routine.ret_type = ftype
 
         self.instrs += [Label(f'__function_{name}'),
                         Instr('frame', self.cur_routine)]
@@ -865,7 +902,7 @@ class Compiler:
 
         # create a variable with the same name as the function. this
         # will be used for returning values.
-        Var(name, self.cur_routine, status='dimmed')
+        Var(name, self.cur_routine, status='dimmed', type=ftype)
 
         # mark the variable as used so that an index is allocated to
         # it.
@@ -879,9 +916,10 @@ class Compiler:
             self.instrs += [Instr(f'pushi{ftype.typespec}', 0),
                             Instr(f'writef{ftype.get_size()}', ret_var)]
 
-        if name in self.declared_functions:
+        if name in self.declared_routines:
             defined_param_types = [v.type for v in self.cur_routine.params]
-            if defined_param_types != self.declared_functions[name]:
+            if defined_param_types != self.declared_routines[name].param_types or \
+               ftype != self.declared_routines[name].ret_type:
                 raise RuntimeError(
                     'FUNCTION definition does not match previous DECLARE.')
 
@@ -1048,7 +1086,8 @@ class Compiler:
     def is_function(self, name):
         return \
             name in builtin_functions or \
-            name in self.declared_functions or \
+            (name in self.declared_routines and
+             self.declared_routines[name].type == 'function') or \
             any(name == r.name for r in self.routines.values()
                 if r.type == 'function')
 
