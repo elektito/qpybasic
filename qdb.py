@@ -63,9 +63,49 @@ Type help or ? to list commands.
         return f'{name} {fargs}'
 
 
+    def print_mem(self, addr):
+        def m(a):
+            self.machine.mem.seek(a)
+            n = self.machine.mem.read(2)
+            return struct.unpack('>H', n)[0]
+
+        if addr > 4*2**30 - 4*16:
+            print('Requested address too large.')
+            return
+
+        for i in range(4):
+            line = ' '.join('{:04x}'.format(m(addr + a)) for a in range(0, 16, 2))
+            print(f'{addr:08x} {line}')
+            addr += 16
+
+
+    def do_mem(self, arg):
+        "Display contents of memory at the given address."
+        arg = arg.strip()
+        if not arg:
+            print('Please provide an address.')
+            return
+        try:
+            addr = int(arg, base=0)
+        except ValueError:
+            addr = -1
+        if addr < 0 or addr >= 4*2**30:
+            print('Invalid address.')
+            return
+        self.print_mem(addr)
+
+
     def do_quit(self, arg):
         "Quit interactive debugger."
         return True
+
+
+    def do_reg(self, arg):
+        "Display the value of machine registers."
+        ip = self.machine.ip
+        sp = self.machine.sp
+        fp = self.machine.fp
+        print(f'IP={ip:#0{10}x} SP={sp:#0{10}x} FP={fp:#0{10}x}')
 
 
     def do_step(self, arg):
