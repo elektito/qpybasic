@@ -26,6 +26,8 @@ class Machine:
         self.ip = 0x100000
         self.stopped = False
 
+        self.check_stack_changes = True
+
 
     def launch(self):
         self.stopped = False
@@ -49,8 +51,11 @@ class Machine:
                 return s
         self.mem.seek(self.ip)
         opcode = self.mem.read_byte()
-        opname = safe_name(asm.opcode_to_instr[opcode].name)
+        instr = asm.opcode_to_instr[opcode]
+        prev_sp = self.sp
+        opname = safe_name(instr.name)
         n = getattr(self, f'exec_{opname}')()
+        self.check_stack(instr, prev_sp, self.sp)
         if isinstance(n, Jump):
             # return value is an absolute jump.
             self.ip = n.target
@@ -58,6 +63,34 @@ class Machine:
             # return value is the number of bytes used from the
             # instruction stream by the exec function.
             self.ip += n + 1
+
+
+    def parse_operands(self, instr):
+        bin_fmt = '>' + ''.join(o.bin_fmt for o in instr.operands)
+        size = sum(o.size for o in instr.operands)
+        self.mem.seek(self.ip + 1)
+        operands = self.mem.read(size)
+        operands = struct.unpack(bin_fmt, operands)
+        return operands
+
+
+    def check_stack(self, instr, old_sp, new_sp):
+        if not self.check_stack_changes:
+            return
+        if instr.stack == None:
+            return
+        if isinstance(instr.stack, int):
+            expected_diff = instr.stack
+        else:
+            operands = self.parse_operands(instr)
+            env = {f'op{i+1}': operands[i] for i in range(len(operands))}
+            expected_diff = eval(instr.stack, env)
+
+        # our stack is from top to bottom, but with the numbers we get
+        # from instruction stack checks, positive means adding to
+        # stack. Here we negate our number to fix this.
+        diff = -(new_sp - old_sp)
+        assert diff == expected_diff
 
 
     def exec_add_integer(self):
