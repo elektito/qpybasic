@@ -865,7 +865,7 @@ class Compiler:
         self.compile_ast(body)
 
         arg_size = sum(v.size for v in self.cur_routine.params)
-        self.instrs += [Instr('unframe', self.cur_routine.name),
+        self.instrs += [Instr('unframe', self.cur_routine),
                         Instr('ret', arg_size)]
         self.cur_routine.instrs = self.instrs
 
