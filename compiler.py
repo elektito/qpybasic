@@ -1089,9 +1089,13 @@ class Compiler:
 
 
     def is_function(self, name):
+        ftype = Type.from_var_name(name)
+        if name[-1] in typespec_chars:
+            name = name[:-1]
         return \
             name in builtin_functions or \
             (name in self.declared_routines and
+             self.declared_routines[name].ret_type == ftype and
              self.declared_routines[name].type == 'function') or \
             any(name == r.name for r in self.routines.values()
                 if r.type == 'function')
