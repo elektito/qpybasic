@@ -286,7 +286,7 @@ class Machine:
         return 4
 
 
-    def exec_pushi_string(self):
+    def exec_pushi_pointer(self):
         value = self.mem.read(4)
         self.push(value)
         logger.debug('EXEC: pushi$')
