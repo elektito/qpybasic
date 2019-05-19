@@ -91,12 +91,8 @@ goto_stmt: GOTO_KW (TYPED_ID | NUMERIC_LITERAL)
 
 let_stmt: LET_KW? TYPED_ID "=" expr
 
-// the .10 suffix gives a higher priority to this rule than any other
-// rule that might ambiguously match, together with this. In
-// particular, print_stmt and call_stmt are ambiguous and here we always
-// give priority to print_stmt relative to that.
-print_stmt.10: PRINT_KW (expr _print_sep)* expr
-             | PRINT_KW expr [_print_sep]
+print_stmt: PRINT_KW (expr _print_sep)* expr
+          | PRINT_KW expr [_print_sep]
 
 _print_sep: SEMICOLON
           | COMMA
