@@ -186,7 +186,7 @@ class Var:
         if status == 'dimmed':
             if used_name in self.routine.no_type_dimmed:
                 # already declared with something like "DIM x$"
-                raise RuntimeError('Use AS on first DIM.') ##### <------------------------------------- FIX the error to the original
+                raise RuntimeError('AS clause required on first declaration.')
 
             if type != None and used_name[-1] in typespec_chars:
                 raise RuntimeError('Invalid variable name.')
