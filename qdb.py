@@ -31,15 +31,19 @@ Type help or ? to list commands.
             print('Nothing more to do.')
             return
 
-        self.machine.mem.seek(self.machine.ip)
-        opcode = self.machine.mem.read_byte()
-        instruction = asm.opcode_to_instr[opcode]
+        instruction = self.get_cur_instr()
         bin_fmt = ''.join(o.bin_fmt for o in instruction.operands)
         text_fmt = [o.text_fmt for o in instruction.operands]
 
         args = self.machine.mem.read(instruction.size - 1)
         instr = self.format_instr(instruction.name, args, bin_fmt, text_fmt)
         print(f'NEXT UP: {instr}')
+
+
+    def get_cur_instr(self):
+        self.machine.mem.seek(self.machine.ip)
+        opcode = self.machine.mem.read_byte()
+        return asm.opcode_to_instr[opcode]
 
 
     def format_instr(self, name, args, bin_fmt, text_fmt):
@@ -93,6 +97,27 @@ Type help or ? to list commands.
             print('Invalid address.')
             return
         self.print_mem(addr)
+
+
+    def do_next(self, arg):
+        """If current instruction is not call, exactly the same as the 'step'
+command. If it is a call, then repeatedly 'step' until the instruction
+after call is reached.
+
+        """
+        if self.machine.stopped:
+            print('Nothing more to do.')
+            return
+
+        instruction = self.get_cur_instr()
+        if instruction.name != 'call':
+            return self.do_step('')
+
+        expected_addr = self.machine.ip + 5
+        self.do_step('')
+        instruction = self.get_cur_instr()
+        while self.machine.ip != expected_addr:
+            self.do_step('')
 
 
     def do_quit(self, arg):
