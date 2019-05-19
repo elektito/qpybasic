@@ -457,7 +457,7 @@ class Expr:
         elif v.type == 'STRING_LITERAL':
             self.parent.add_string_literal(v[1:-1])
             self.instrs += [Instr('pushi$', v.value)]
-            self.type = t
+            self.type = Type('$')
         elif v.type == 'NUMERIC_LITERAL':
             t = get_literal_type(v.value)
             if t.name.lower() in ['integer', 'long']:
@@ -1126,6 +1126,9 @@ class Assembler:
             elif instr.name in ['frame', 'unframe']:
                 frame_size = sum(v.size for v in instr.operands[0].local_vars)
                 operands = [frame_size]
+            elif instr.name == 'pushi$':
+                s = instr.operands[0][1:-1]
+                operands = [STRING_ADDR + self.compiler.string_literals[s]]
             elif instr.name == 'syscall':
                 call_code = {
                     '__cls': 0x02,
