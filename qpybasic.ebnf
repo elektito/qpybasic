@@ -160,4 +160,7 @@ SUB_KW: "sub"i
 THEN_KW: "then"i
 TO_KW: "to"i
 
+COMMENT: /('|[rR][eE][mM][ \t\f]).*\n/
+%ignore COMMENT
+
 %declare END_CMD

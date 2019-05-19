@@ -5,6 +5,7 @@ with open('qpybasic.ebnf') as f:
     grammar_text = f.read()
 
 prog = r"""
+'sample code
 declare function fib%(n%)
 
 dim i as integer
