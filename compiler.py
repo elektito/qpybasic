@@ -774,6 +774,16 @@ class Compiler:
             self.declared_routines[name] = dr
 
 
+    def process_dim_stmt(self, ast):
+        if len(ast.children) == 2:
+            _, name = ast.children
+            Var(name, self.cur_routine, status='dimmed')
+        else:
+            _, name, _, typename = ast.children
+            typename = typename.children[0].value
+            Var(name, self.cur_routine, type=Type(typename), status='dimmed')
+
+
     def process_end_stmt(self, ast):
         self.instrs += [Instr('end')]
 

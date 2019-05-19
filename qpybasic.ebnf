@@ -32,6 +32,7 @@ lineno: NUMERIC_LITERAL
 ?stmt: call_stmt
      | cls_stmt
      | declare_stmt
+     | dim_stmt
      | end_stmt
      | goto_stmt
      | let_stmt
@@ -81,6 +82,8 @@ argument_list: expr ("," expr)*
 cls_stmt: CLS_KW
 
 declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) TYPED_ID parameter_list
+
+dim_stmt: DIM_KW TYPED_ID [AS_KW typename]
 
 end_stmt: END_CMD
 
@@ -140,6 +143,7 @@ AS_KW: "as"i
 CALL_KW: "call"i
 CLS_KW: "cls"i
 DECLARE_KW: "declare"i
+DIM_KW: "dim"i
 DOUBLE_KW: "double"i
 ELSE_KW: "else"i
 ELSEIF_KW: "elseif"i
