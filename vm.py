@@ -379,7 +379,7 @@ class Machine:
         arg_size = self.mem.read(2)
         arg_size, = struct.unpack('>H', arg_size)
         target, = struct.unpack('>I', self.pop(4))
-        self.sp -= arg_size
+        self.sp += arg_size
         logger.debug('EXEC: ret')
         return Jump(target)
 
@@ -391,7 +391,7 @@ class Machine:
         retv_size, = struct.unpack('>H', retv_size)
         retv = self.pop(retv_size)
         target, = struct.unpack('>I', self.pop(4))
-        self.sp -= arg_size
+        self.sp += arg_size
         self.push(retv)
         logger.debug('EXEC: ret_r')
         return Jump(target)

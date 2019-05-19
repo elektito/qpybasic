@@ -7,13 +7,15 @@ with open('qpybasic.ebnf') as f:
 prog = r"""
 declare function fib%(n%)
 
-print fib%(3 )
+for i% = 1 to 10
+   print "fib"; i%; fib%(i%)
+next
 
 function fib%(n%)
    if n% < 3 then
       fib% = 1
    else
-      fib% = fib%(1) + fib%(1)
+      fib% = fib%(n%-2) + fib%(n%-1)
    end if
 end function
 
