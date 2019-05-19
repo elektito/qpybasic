@@ -173,6 +173,17 @@ class Machine:
         return 0
 
 
+    def exec_ge(self):
+        value = self.pop(2)
+        value, = struct.unpack('>h', value)
+        if value >= 0:
+            self.push(TRUE)
+        else:
+            self.push(FALSE)
+        logger.debug('EXEC: ge')
+        return 0
+
+
     def exec_le(self):
         value = self.pop(2)
         value, = struct.unpack('>h', value)
