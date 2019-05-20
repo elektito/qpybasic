@@ -643,6 +643,8 @@ class Compiler:
 
 
     def compile(self, code):
+        code += '\n'
+
         self.instrs = []
         self.cur_routine = Routine('__main', 'sub')
         self.routines = {'__main': self.cur_routine}

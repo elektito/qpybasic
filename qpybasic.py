@@ -25,7 +25,7 @@ end function
 """
 
 c = Compiler()
-module = c.compile(prog + '\n')
+module = c.compile(prog)
 for i in c.instrs:
     print(i)
 with open('foo.mod', 'wb') as f:
