@@ -172,83 +172,97 @@ class Type:
 
 
 class Var:
-    def __init__(self, used_name, routine, *, status='used', is_param=False, type=None, byref=False):
-        assert status in ['used', 'dimmed']
+    @staticmethod
+    def dim(used_name, routine, *, is_param=False, type=None, byref=False):
         assert not byref or is_param
 
-        if isinstance(used_name, Tree):
-            assert len(used_name.children) == 1 and isinstance(used_name.children[0], Token)
-            used_name = used_name.children[0].value
+        var = Var()
 
-        self.routine = routine
-        self.byref = byref
+        var.routine = routine
+        var.byref = byref
 
-        if status == 'dimmed':
-            if used_name in self.routine.no_type_dimmed:
-                # already declared with something like "DIM x$"
-                raise RuntimeError('AS clause required on first declaration.')
+        if used_name in routine.no_type_dimmed:
+            # already declared with something like "DIM x$"
+            raise RuntimeError('AS clause required on first declaration.')
 
-            if type != None and used_name[-1] in typespec_chars:
-                raise RuntimeError('Invalid variable name.')
-            elif type != None and used_name[-1] not in typespec_chars:
-                self.name = used_name
-                self.type = type
-            elif type == None and used_name[-1] in typespec_chars:
-                # DIM x$
-                self.name = used_name[:-1]
-                self.type = Type(used_name[-1])
+        if type != None and used_name[-1] in typespec_chars:
+            raise RuntimeError('Invalid variable name.')
+        elif type != None and used_name[-1] not in typespec_chars:
+            var.name = used_name
+            var.type = type
+        elif type == None and used_name[-1] in typespec_chars:
+            # DIM x$
+            var.name = used_name[:-1]
+            var.type = Type(used_name[-1])
 
-                # this is almost the same as using the variable
-                # without DIM, except for the fact that you can't DIM
-                # it again. so we add the name to a separate list, so
-                # that we won't let the variable to be DIM'ed again.
-                routine.no_type_dimmed.add(self.name)
-            else: # type == None and used_name[-1] not in typespec_chars:
-                self.name = used_name
-                self.type = get_default_type(used_name)
+            # this is almost the same as using the variable without
+            # DIM, except for the fact that you can't DIM it again. so
+            # we add the name to a separate list, so that we won't let
+            # the variable to be DIM'ed again.
+            routine.no_type_dimmed.add(var.name)
+        else: # type == None and used_name[-1] not in typespec_chars:
+            var.name = used_name
+            var.type = get_default_type(used_name)
 
-            if self.name in routine.dimmed_vars:
-                raise RuntimeError('Duplicate definition.')
+        if var.name in routine.dimmed_vars:
+            raise RuntimeError('Duplicate definition.')
 
-            if self.name not in routine.no_type_dimmed:
-                # not properly dimmed (no AS clause), and can't be
-                # used without the typespec, so do not add it to the
-                # list.
-                routine.dimmed_vars[self.name] = self
+        if var.name not in routine.no_type_dimmed:
+            # not properly dimmed (no AS clause), and can't be used
+            # without the typespec, so do not add it to the list.
+            routine.dimmed_vars[var.name] = var
 
-            if is_param:
-                self.routine.params.append(self)
-            elif self not in self.routine.local_vars:
-                self.routine.local_vars.append(self)
-        elif status == 'used':
-            assert type == None
+        if is_param:
+            routine.params.append(var)
+        elif var not in var.routine.local_vars:
+            routine.local_vars.append(var)
 
-            if used_name[-1] in typespec_chars:
-                self.name = used_name[:-1]
-                self.type = Type(used_name[-1])
+        if var not in routine.all_vars:
+            routine.all_vars.append(var)
+
+        var.is_param = is_param
+
+        return var
+
+
+    @staticmethod
+    def get(used_name, routine, *, is_param=False, type=None, byref=False):
+        assert type == None
+        assert not byref or is_param
+
+        var = Var()
+
+        var.routine = routine
+        var.byref = byref
+
+        if used_name[-1] in typespec_chars:
+            var.name = used_name[:-1]
+            var.type = Type(used_name[-1])
+        else:
+            var.name = used_name
+            if used_name in routine.dimmed_vars:
+                var.type = routine.dimmed_vars[used_name].type
             else:
-                self.name = used_name
-                if used_name in routine.dimmed_vars:
-                    self.type = routine.dimmed_vars[used_name].type
-                else:
-                    self.type = get_default_type(used_name)
+                var.type = get_default_type(used_name)
 
-            if self not in self.routine.params and self not in self.routine.local_vars:
-                self.routine.local_vars.append(self)
+        if var not in routine.params and var not in routine.local_vars:
+            var.routine.local_vars.append(var)
 
-            if self in self.routine.params:
-                pidx = self.routine.params.index(self)
-                self.idx = 8 + sum(v.size for v in self.routine.params[:pidx])
-                self.byref = self.routine.params[pidx].byref
-            else:
-                lidx = self.routine.local_vars.index(self)
-                self.idx = -sum(v.size for v in self.routine.local_vars[:lidx+1])
-                self.byref = False
+        if var in routine.params:
+            pidx = routine.params.index(var)
+            var.idx = 8 + sum(v.size for v in routine.params[:pidx])
+            var.byref = routine.params[pidx].byref
+        else:
+            lidx = routine.local_vars.index(var)
+            var.idx = -sum(v.size for v in routine.local_vars[:lidx+1])
+            var.byref = False
 
-        if self not in routine.all_vars:
-            routine.all_vars.append(self)
+        if var not in routine.all_vars:
+            routine.all_vars.append(var)
 
-        self.is_param = is_param
+        var.is_param = is_param
+
+        return var
 
 
     def gen_read_instructions(self):
@@ -422,7 +436,7 @@ class Expr:
             for a in reversed(args):
                 if isinstance(a, Tree) and a.data == 'value' and a.children[0].type == 'ID':
                     # just a variable: send byref
-                    v = Var(a.children[0].value, self.parent.cur_routine)
+                    v = Var.get(a.children[0].value, self.parent.cur_routine)
                     if fname in self.parent.routines:
                         if v.type != self.parent.routines[fname].params[i].type:
                             raise RuntimeError('Parameter type mismatch.')
@@ -436,7 +450,7 @@ class Expr:
                         typespec = self.parent.routines[fname].params[i].type.typespec
                     else:
                         typespec = self.parent.declared_routines[fname].param_types[i].typespec
-                    v = Var(self.parent.gen_var('rvalue', typespec), self.parent.cur_routine)
+                    v = Var.get(self.parent.gen_var('rvalue', typespec), self.parent.cur_routine)
                     self.parent.gen_set_var_code(v, e)
                     self.instrs += [Instr('pushfp', v)]
 
@@ -451,7 +465,7 @@ class Expr:
             if self.parent.is_function(v):
                 self.process_function_call(ast)
             else:
-                var = Var(v, self.parent.cur_routine)
+                var = Var.get(v, self.parent.cur_routine)
                 self.instrs += var.gen_read_instructions()
                 self.type = var.type
         elif v.type == 'STRING_LITERAL':
@@ -706,7 +720,7 @@ class Compiler:
         for a in reversed(args.children):
             if isinstance(a, Tree) and a.data == 'value' and a.children[0].type == 'ID':
                 # just a variable: send byref
-                v = Var(a.children[0].value, self.cur_routine)
+                v = Var.get(a.children[0].value, self.cur_routine)
                 if v.type != self.routines[sub_name].params[i].type:
                     raise RuntimeError('Parameter type mismatch.')
                 self.instrs += [Instr('pushfp', v)]
@@ -714,7 +728,7 @@ class Compiler:
 
                 e = Expr(a, self)
                 typespec = self.routines[sub_name].params[i].type.typespec
-                v = Var(self.gen_var('rvalue', typespec), self.cur_routine)
+                v = Var.get(self.gen_var('rvalue', typespec), self.cur_routine)
                 self.gen_set_var_code(v, e)
                 self.instrs += [Instr('pushfp', v)]
 
@@ -777,11 +791,11 @@ class Compiler:
     def process_dim_stmt(self, ast):
         if len(ast.children) == 2:
             _, name = ast.children
-            Var(name, self.cur_routine, status='dimmed')
+            Var.dim(name, self.cur_routine)
         else:
             _, name, _, typename = ast.children
             typename = typename.children[0].value
-            Var(name, self.cur_routine, type=Type(typename), status='dimmed')
+            Var.dim(name, self.cur_routine, type=Type(typename))
 
 
     def process_end_stmt(self, ast):
@@ -790,18 +804,18 @@ class Compiler:
 
     def process_for_block(self, ast):
         _, var, start, _, end, step, body, next_stmt = ast.children
-        var = Var(var, self.cur_routine)
+        var = Var.get(var, self.cur_routine)
         if var.type.typespec == '$':
             self.error('Invalid FOR variable.')
 
         if len(next_stmt.children) == 2:
             # "NEXT var" is used. Check if NEXT variable matches FOR
             # variable.
-            next_var = Var(next_stmt.children[1], self.cur_routine)
+            next_var = Var.get(next_stmt.children[1], self.cur_routine)
             if next_var != var:
                 self.error('NEXT variable does not match FOR.')
 
-        step_var = Var(self.gen_var('for_step', var.type.typespec), self.cur_routine)
+        step_var = Var.get(self.gen_var('for_step', var.type.typespec), self.cur_routine)
         if step.children:
             e = Expr(step.children[1], self)
             self.gen_set_var_code(step_var, e)
@@ -809,7 +823,7 @@ class Compiler:
             self.instrs += [Instr(f'pushi{var.type.typespec}', 1),
                             Instr(f'writef{var.size}', step_var)]
 
-        end_var = Var(self.gen_var('for_end', var.type.typespec), self.cur_routine)
+        end_var = Var.get(self.gen_var('for_end', var.type.typespec), self.cur_routine)
         e = Expr(end, self)
         self.gen_set_var_code(end_var, e)
 
@@ -861,7 +875,7 @@ class Compiler:
             if any(pname == i.name for i in self.cur_routine.local_vars):
                 self.error('Duplicate parameter.')
 
-            var = Var(pname, self.cur_routine, type=ptype, is_param=True, status='dimmed', byref=True)
+            var = Var.dim(pname, self.cur_routine, type=ptype, is_param=True, byref=True)
 
         if name in self.declared_routines:
             defined_param_types = [v.type for v in self.cur_routine.params]
@@ -913,15 +927,15 @@ class Compiler:
             if any(pname == i.name for i in self.cur_routine.local_vars):
                 self.error('Duplicate parameter.')
 
-            var = Var(pname, self.cur_routine, type=ptype, is_param=True, status='dimmed', byref=True)
+            var = Var.dim(pname, self.cur_routine, type=ptype, is_param=True, byref=True)
 
         # create a variable with the same name as the function. this
         # will be used for returning values.
-        Var(name, self.cur_routine, status='dimmed', type=ftype)
+        Var.dim(name, self.cur_routine, type=ftype)
 
         # mark the variable as used so that an index is allocated to
         # it.
-        ret_var = Var(name, self.cur_routine, status='used')
+        ret_var = Var.get(name, self.cur_routine)
 
         # initialize the return variable.
         if ftype.name == 'STRING':
@@ -1017,7 +1031,7 @@ class Compiler:
             ast.children = ast.children[1:]
 
         var, expr = ast.children
-        var = Var(var, self.cur_routine)
+        var = Var.get(var, self.cur_routine)
         expr = Expr(expr, self)
         self.gen_set_var_code(var, expr)
 
