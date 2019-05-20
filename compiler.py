@@ -659,15 +659,6 @@ class Compiler:
         # possibly return value.
         self.declared_routines = {}
 
-        # add string literals used by the compiler
-        self.add_string_literal(';')
-        self.add_string_literal(',')
-        self.add_string_literal('%')
-        self.add_string_literal('&')
-        self.add_string_literal('!')
-        self.add_string_literal('#')
-        self.add_string_literal('$')
-
         # Create the main stack frame. The argument to the 'frame'
         # instruction is stack frame size, the actual value of which
         # will be filled in later.
