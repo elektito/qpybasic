@@ -2,6 +2,7 @@
 
 import struct
 import logging
+import argparse
 import asm
 import logging.config
 from mmap import mmap
@@ -596,9 +597,45 @@ class Machine:
         exit(1)
 
 
+    def shutdown(self):
+        self.stopped = True
+        self.mem.close()
+
+
+    @staticmethod
+    def load(module):
+        if isinstance(module, str):
+            with open(module, 'rb') as f:
+                logger.info('Reading module file...')
+                module = f.read()
+
+            logger.info('Parsing module...')
+            module = Module.parse(module)
+        elif hasattr(module, 'read'):
+            logger.info('Reading module file...')
+            module = module.read()
+
+            logger.info('Parsing module...')
+            module = Module.parse(module)
+        else:
+            assert isinstance(module, Module)
+
+        logger.info('Mapping module memory...')
+        mem = mmap(-1, 4 * 2**30)
+        for sec_type, sec in module.sections.items():
+            mem.seek(sec['addr'])
+            mem.write(sec['data'])
+            logger.info(f'Mapped section (type={sec_type}) to address {hex(sec["addr"])}.')
+
+        return Machine(mem)
+
+
 def main():
-    import sys
-    filename = sys.argv[1]
+    parser = argparse.ArgumentParser(
+        description='Run a qpybasic module.')
+
+    parser.add_argument('module_file', help='The module file to load.')
+    args = parser.parse_args()
 
     logging.config.dictConfig({
         'version': 1,
@@ -624,22 +661,9 @@ def main():
         },
     })
 
-    with open(filename, 'rb') as f:
-        logger.info('Reading module file...')
-        module = f.read()
-
-    logger.info('Parsing module...')
-    module = Module.parse(module)
-
-    logger.info('Mapping module memory...')
-    mem = mmap(-1, 4 * 2**30)
-    for sec_type, sec in module.sections.items():
-        mem.seek(sec['addr'])
-        mem.write(sec['data'])
-        logger.info(f'Mapped section (type={sec_type}) to address {hex(sec["addr"])}.')
-
-    machine = Machine(mem)
+    machine = Machine.load(args.module_file)
     machine.launch()
+    machine.shutdown()
 
 
 if __name__ == '__main__':
