@@ -238,12 +238,16 @@ class Var:
         if used_name[-1] in typespec_chars:
             var.name = used_name[:-1]
             var.type = Type(used_name[-1])
+
+            if var.name not in routine.dimmed_vars:
+                routine.no_type_dimmed.add(var.name)
         else:
             var.name = used_name
             if used_name in routine.dimmed_vars:
                 var.type = routine.dimmed_vars[used_name].type
             else:
                 var.type = get_default_type(used_name)
+                routines.no_type_dimmed.add(var.name)
 
         if var not in routine.params and var not in routine.local_vars:
             var.routine.local_vars.append(var)
