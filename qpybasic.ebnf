@@ -25,7 +25,7 @@ _line: [label | lineno] _stmt_group
 _stmt_group: (stmt ":") _stmt_group
            | stmt?
 
-label: TYPED_ID ":"
+label: ID ":"
 
 lineno: NUMERIC_LITERAL
 
@@ -40,11 +40,11 @@ lineno: NUMERIC_LITERAL
 
 for_block: _for_stmt block_body next_stmt
 
-_for_stmt: FOR_KW TYPED_ID "=" expr TO_KW expr step_phrase _nl
+_for_stmt: FOR_KW ID "=" expr TO_KW expr step_phrase _nl
 
 step_phrase: [STEP_KW expr]
 
-next_stmt: NEXT_KW [TYPED_ID]
+next_stmt: NEXT_KW [ID]
 
 if_block: IF_KW expr THEN_KW _NEWLINE block_body else_list END_KW IF_KW
 
@@ -52,12 +52,12 @@ else_list: ELSEIF_KW expr THEN_KW _NEWLINE block_body else_list  -> elseif_sub_b
          | ELSE_KW _NEWLINE block_body                           -> else_sub_block
          |
 
-sub_block: SUB_KW TYPED_ID parameter_list _NEWLINE block_body END_KW SUB_KW
+sub_block: SUB_KW ID parameter_list _NEWLINE block_body END_KW SUB_KW
 
 parameter_list: "(" parameter_definition ("," parameter_definition)* ")"
               |
 
-parameter_definition: TYPED_ID [AS_KW typename]
+parameter_definition: ID [AS_KW typename]
 
 typename: INTEGER_KW
         | LONG_KW
@@ -65,7 +65,7 @@ typename: INTEGER_KW
         | DOUBLE_KW
         | STRING_KW
 
-function_block: FUNCTION_KW TYPED_ID parameter_list _NEWLINE block_body END_KW FUNCTION_KW
+function_block: FUNCTION_KW ID parameter_list _NEWLINE block_body END_KW FUNCTION_KW
 
 block_body: _block_body_item*
 
@@ -73,23 +73,23 @@ _block_body_item: block _NEWLINE
                 | _line _NEWLINE
                 | _NEWLINE
 
-call_stmt: TYPED_ID argument_list
-         | CALL_KW TYPED_ID "(" argument_list ")"
+call_stmt: ID argument_list
+         | CALL_KW ID "(" argument_list ")"
 
 argument_list: expr ("," expr)*
              |
 
 cls_stmt: CLS_KW
 
-declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) TYPED_ID parameter_list
+declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) ID parameter_list
 
-dim_stmt: DIM_KW TYPED_ID [AS_KW typename]
+dim_stmt: DIM_KW ID [AS_KW typename]
 
 end_stmt: END_CMD
 
-goto_stmt: GOTO_KW (TYPED_ID | NUMERIC_LITERAL)
+goto_stmt: GOTO_KW (ID | NUMERIC_LITERAL)
 
-let_stmt: LET_KW? TYPED_ID "=" expr
+let_stmt: LET_KW? ID "=" expr
 
 print_stmt: PRINT_KW (expr _print_sep)* expr
           | PRINT_KW expr [_print_sep]
@@ -120,8 +120,8 @@ _print_sep: SEMICOLON
 
 value: NUMERIC_LITERAL
      | STRING_LITERAL
-     | TYPED_ID
-     | TYPED_ID "(" argument_list ")"  -> function_call
+     | ID
+     | ID "(" argument_list ")"  -> function_call
 
 _NEWLINE: "\n"
         | "\r\n"
@@ -129,8 +129,7 @@ _NEWLINE: "\n"
         | ":"
 SEMICOLON: ";"
 COMMA: ","
-ID: /[a-z_][a-z0-9]*/i
-TYPED_ID: /[a-z_][a-z0-9]*[!#%&$]?/i
+ID: /[a-z_][a-z0-9]*[!#%&$]?/i
 INT_LITERAL: /\d+/
 NUMERIC_LITERAL: /\d+(\.\d*)?[!#%&]?/
 STRING_LITERAL: /"[^"]*"/

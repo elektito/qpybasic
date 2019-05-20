@@ -420,7 +420,7 @@ class Expr:
 
             i = len(args) - 1
             for a in reversed(args):
-                if isinstance(a, Tree) and a.data == 'value' and a.children[0].type == 'TYPED_ID':
+                if isinstance(a, Tree) and a.data == 'value' and a.children[0].type == 'ID':
                     # just a variable: send byref
                     v = Var(a.children[0].value, self.parent.cur_routine)
                     if fname in self.parent.routines:
@@ -447,7 +447,7 @@ class Expr:
 
     def process_value(self, ast):
         v = ast.children[0]
-        if v.type == 'TYPED_ID': # variable or function call
+        if v.type == 'ID': # variable or function call
             if self.parent.is_function(v):
                 self.process_function_call(ast)
             else:
@@ -704,7 +704,7 @@ class Compiler:
 
         i = len(args.children) - 1
         for a in reversed(args.children):
-            if isinstance(a, Tree) and a.data == 'value' and a.children[0].type == 'TYPED_ID':
+            if isinstance(a, Tree) and a.data == 'value' and a.children[0].type == 'ID':
                 # just a variable: send byref
                 v = Var(a.children[0].value, self.cur_routine)
                 if v.type != self.routines[sub_name].params[i].type:
@@ -960,7 +960,7 @@ class Compiler:
 
     def process_goto_stmt(self, ast):
         _, target = ast.children
-        if target.type == 'TYPED_ID':
+        if target.type == 'ID':
             self.instrs += [Instr('jmp', target)]
         else:
             self.instrs += [Instr('jmp', f'__lineno_{target.value}')]
