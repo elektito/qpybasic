@@ -1,4 +1,5 @@
 import struct
+import enum
 from collections import OrderedDict
 from lark import Lark, Token, Tree
 from asm import Instr
@@ -550,41 +551,99 @@ class Label:
         return '{}:'.format(self.value)
 
 
-class Module:
-    def __init__(self, bytecode, string_literals):
-        self.bytecode = bytecode
-        self.string_literals = string_literals
+class Sections(enum.IntEnum):
+    CODE = 1
+    STRINGS = 2
 
-        self.file_magic = b'QB'
-        self.version = 1
-        self.code_section_type = 1
-        self.const_section_type = 2
+
+class Module:
+    file_magic = b'QB'
+    version = 1
+
+    def __init__(self, sections):
+        # at the moment only two sections are supported.
+        assert set(sections) == {Sections.CODE, Sections.STRINGS}
+
+        self.sections = sections
+
 
     def dump(self):
         # file header: magic, version, nsections
         file_hdr = self.file_magic + struct.pack('>BH', self.version, 2)
 
         # code section header: type, len, load_addr
+        code_section = self.sections[Sections.CODE]
         code_section_hdr = struct.pack('>BII',
-                                       self.code_section_type,
-                                       len(self.bytecode),
-                                       INITIAL_ADDR)
+                                       int(Sections.CODE),
+                                       len(code_section['data']),
+                                       code_section['addr'])
 
         # const section header: type, len, load_addr
-        total_len = sum(len(i) + 2 for i in self.string_literals)
-        const_section_hdr = struct.pack('>BII',
-                                        self.const_section_type,
-                                        total_len,
-                                        STRING_ADDR)
+        str_section = self.sections[Sections.STRINGS]
+        total_len = sum(len(i) + 2 for i in str_section['data'])
+        str_section_hdr = struct.pack('>BII',
+                                      int(Sections.STRINGS),
+                                      total_len,
+                                      str_section['addr'])
 
-        const_section = b''.join(struct.pack('>h', len(i)) + i.encode('ascii')
-                                 for i in self.string_literals)
+        str_section_data = b''.join(struct.pack('>h', len(i)) + i.encode('ascii')
+                                    for i in str_section['data'])
 
         return file_hdr + \
             code_section_hdr + \
-            self.bytecode + \
-            const_section_hdr + \
-            const_section
+            code_section['data'] + \
+            str_section_hdr + \
+            str_section_data
+
+
+    @staticmethod
+    def parse(module):
+        file_hdr = module[:5]
+        magic = file_hdr[:2]
+        if magic != Module.file_magic:
+            logger.error('Invalid magic. Module is not valid.')
+            exit(1)
+        version, nsections = struct.unpack('>BH', file_hdr[2:])
+        if version != Module.version:
+            raise RuntimeError('Unsupported module version.')
+
+        module = module[5:]
+
+        sections = {}
+        for i in range(nsections):
+            hdr = module[:9]
+            t, l, a = struct.unpack('>BII', hdr)
+            data = module[9:9+l]
+            assert len(data) == l
+            sections[Sections(t)] = {
+                'addr': a,
+                'data': data,
+            }
+            module = module[9+l:]
+
+        return Module(sections)
+
+
+    @staticmethod
+    def create(bytecode, string_literals):
+        # the string_literals passed to this function is a dictionary
+        # which maps each string to its index in the string
+        # section. we just convert it to a list of strings sorted by
+        # that index here. the strings will be placed in the proper
+        # location later as long as this list is sorted correctly.
+        string_literals = list(sorted(string_literals.items(), key=lambda r: r[1]))
+        string_literals = [value for value, index in string_literals]
+
+        return Module({
+            Sections.CODE: {
+                'addr': INITIAL_ADDR,
+                'data': bytecode,
+            },
+            Sections.STRINGS: {
+                'addr': STRING_ADDR,
+                'data': string_literals,
+            },
+        })
 
 
 class PostLex:
@@ -677,7 +736,7 @@ class Compiler:
 
         assembler = Assembler(self)
         self.bytecode = assembler.assemble(self.instrs)
-        return Module(self.bytecode, self.string_literals)
+        return Module.create(self.bytecode, self.string_literals)
 
 
     def compile_ast(self, ast):
