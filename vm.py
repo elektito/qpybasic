@@ -5,6 +5,7 @@ import logging
 import asm
 import logging.config
 from mmap import mmap
+from compiler import Module
 
 
 TRUE = struct.pack('>h', -1)
@@ -595,28 +596,6 @@ class Machine:
         exit(1)
 
 
-def parse_module(module):
-    file_hdr = module[:5]
-    magic = file_hdr[:2]
-    if magic != b'QB':
-        logger.error('Invalid magic. Module is not valid.')
-        exit(1)
-    version, nsections = struct.unpack('>BH', file_hdr[2:])
-
-    module = module[5:]
-
-    sections = []
-    for i in range(nsections):
-        hdr = module[:9]
-        t, l, a = struct.unpack('>BII', hdr)
-        data = module[9:9+l]
-        assert len(data) == l
-        sections.append((t, l, a, data))
-        module = module[9+l:]
-
-    return sections
-
-
 def main():
     import sys
     filename = sys.argv[1]
@@ -650,14 +629,14 @@ def main():
         module = f.read()
 
     logger.info('Parsing module...')
-    sections = parse_module(module)
+    module = Module.parse(module)
 
     logger.info('Mapping module memory...')
     mem = mmap(-1, 4 * 2**30)
-    for t, l, a, data in sections:
-        mem.seek(a)
-        mem.write(data)
-        logger.info(f'Mapped section (type={t}) to address {hex(a)}.')
+    for sec_type, sec in module.sections.items():
+        mem.seek(sec['addr'])
+        mem.write(sec['data'])
+        logger.info(f'Mapped section (type={sec_type}) to address {hex(sec["addr"])}.')
 
     machine = Machine(mem)
     machine.launch()
