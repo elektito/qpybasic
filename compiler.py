@@ -1,5 +1,6 @@
 import struct
 from collections import OrderedDict
+from enum import IntEnum, unique
 from lark import Lark, Token, Tree
 from asm import Instr
 from module import Module
@@ -49,7 +50,8 @@ def get_literal_type(literal):
     elif literal[-1] in '!#%&': # numeric literal with typespec
         # sanity check first
         if '.' in literal and literal[-1] not in '!#':
-            raise RuntimeError('Invalid numeric literal: {}'.format(literal))
+            raise CompileError(EC.INVALID_NUM_LITERAL,
+                               'Invalid numeric literal: {}'.format(literal))
         return Type(literal[-1])
     else: # numeric literal without typespec
         if '.' in literal: # single or double
@@ -61,7 +63,7 @@ def get_literal_type(literal):
             elif -2**31 <= v < 2**31:
                 return Type('&')
             else:
-                raise RuntimeError('Integer value out of possible range.')
+                raise CompileError(EC.INT_OUT_OF_RANGE)
 
 
 def get_default_type(var_name):
@@ -72,7 +74,7 @@ def get_default_type(var_name):
 
 def builtin_func_abs(parent, args):
     if len(args) != 1:
-        raise RuntimeError('Invalid number of arguments passed to function.')
+        raise CompileError(EC.INVALID_FUNC_NARGS)
 
     arg, = args
     e = Expr(arg, parent)
@@ -90,6 +92,116 @@ def builtin_func_abs(parent, args):
 builtin_functions = {
     'abs': builtin_func_abs,
 }
+
+
+@unique
+class ErrorCodes(IntEnum):
+    AS_CLAUSE_REQUIRED_ON_FIRST_DECL = 1
+    INVALID_VAR_NAME = 2
+    DUP_DEF = 3
+    FUNC_RET_TYPE_MISMATCH = 4
+    INT_OUT_OF_RANGE = 5
+    SUB_CALLED_AS_FUNC = 6
+    PARAM_TYPE_MISMATCH = 7
+    DECL_ONLY_AT_TOP = 8
+    INVALID_SUB_NAME = 9
+    DECL_NOT_MATCH_DEF = 10
+    CONFLICTING_DECL = 11
+    SUB_DEF_NOT_MATCH_DECL = 12
+    FUNC_DEF_NOT_MATCH_DECL = 13
+    INVALID_FUNC_NARGS = 14
+    INVALID_FOR_VAR = 15
+    NEXT_VAR_NOT_MATCH_FOR = 16
+    DUP_PARAM = 17
+    NEXT_WITHOUT_FOR = 18
+    NO_SUCH_FUNC = 19
+    NO_SUCH_SUB = 20
+    INVALID_NUM_LITERAL = 21
+    CANNOT_CONVERT_TYPE = 22
+
+
+    def __str__(self):
+        return {
+            self.AS_CLAUSE_REQUIRED_ON_FIRST_DECL:
+            'AS clause required on first declaration',
+
+            self.INVALID_VAR_NAME:
+            'Invalid variable name',
+
+            self.DUP_DEF:
+            'Duplicate definition',
+
+            self.FUNC_RET_TYPE_MISMATCH:
+            'FUNCTION return type mismatch',
+
+            self.INT_OUT_OF_RANGE:
+            'Integer value out of range',
+
+            self.SUB_CALLED_AS_FUNC:
+            'SUB cannot be called like a FUNCTION',
+
+            self.PARAM_TYPE_MISMATCH:
+            'Parameter type mismatch',
+
+            self.DECL_ONLY_AT_TOP:
+            'DECLARE statement only valid in top-level',
+
+            self.INVALID_SUB_NAME:
+            'Invalid SUB name',
+
+            self.DECL_NOT_MATCH_DEF:
+            'DECLARE statement does not match definition',
+
+            self.CONFLICTING_DECL:
+            'Conflicting DECLARE statements',
+
+            self.SUB_DEF_NOT_MATCH_DECL:
+            'SUB definition does not match previous DECLARE',
+
+            self.FUNC_DEF_NOT_MATCH_DECL:
+            'FUNCTION definition does not match previous DECLARE',
+
+            self.INVALID_FUNC_NARGS:
+            'Invalid number of arguments passed to FUNCTION',
+
+            self.INVALID_FOR_VAR:
+            'Invalid FOR variable',
+
+            self.NEXT_VAR_NOT_MATCH_FOR:
+            'NEXT variable does not match FOR',
+
+            self.DUP_PARAM:
+            'Duplicate parameter',
+
+            self.NEXT_WITHOUT_FOR:
+            'NEXT without FOR',
+
+            self.NO_SUCH_FUNC:
+            'No such function',
+
+            self.NO_SUCH_SUB:
+            'No such sub-routine',
+
+            self.INVALID_NUM_LITERAL:
+            'Invalid numeric literal',
+
+            self.CANNOT_CONVERT_TYPE:
+            'Cannot convert type.',
+        }.get(int(self), super().__str__())
+
+
+# alias for easier typing
+EC = ErrorCodes
+
+
+class CompileError(Exception):
+    def __init__(self, code, msg=None):
+        assert isinstance(code, ErrorCodes)
+
+        if not msg:
+            msg = str(code)
+
+        super().__init__(msg)
 
 
 class Type:
@@ -175,10 +287,10 @@ class Var:
 
         if used_name in routine.no_type_dimmed:
             # already declared with something like "DIM x$"
-            raise RuntimeError('AS clause required on first declaration.')
+            raise CompileError(EC.AS_CLAUSE_REQUIRED_ON_FIRST_DECL)
 
         if type != None and used_name[-1] in typespec_chars:
-            raise RuntimeError('Invalid variable name.')
+            raise CompileError(EC.INVALID_VAR_NAME)
         elif type != None and used_name[-1] not in typespec_chars:
             var.name = used_name
             var.type = type
@@ -197,7 +309,7 @@ class Var:
             var.type = get_default_type(used_name)
 
         if var.name in routine.dimmed_vars:
-            raise RuntimeError('Duplicate definition.')
+            raise CompileError(EC.DUP_DEF)
 
         if var.name not in routine.no_type_dimmed:
             # not properly dimmed (no AS clause), and can't be used
@@ -413,20 +525,20 @@ class Expr:
             f = builtin_functions[fname]
             self.type, self.instrs = f(self.parent, args)
             if called_type and self.type != called_type:
-                raise RuntimeError('Function return type mismatch.')
+                raise CompileError(EC.FUNC_RET_TYPE_MISMATCH)
         else:
             if fname in self.parent.routines:
                 self.type = self.parent.routines[fname].ret_type
             elif fname in self.parent.declared_routines:
                 r = self.parent.declared_routines[fname]
                 if r.type == 'sub':
-                    raise RuntimeError('SUB cannot be called as a function.')
+                    raise CompileError(EC.SUB_CALLED_AS_FUNC)
                 self.type = r.ret_type
             else:
-                raise RuntimeError(f'No such function: {fname}')
+                raise CompileError(EC.NO_SUCH_FUNC, f'No such function: {fname}')
 
             if called_type and self.type != called_type:
-                raise RuntimeError('Function return type mismatch.')
+                raise CompileError(EC.FUNC_RET_TYPE_MISMATCH)
 
             i = len(args) - 1
             for a in reversed(args):
@@ -435,10 +547,10 @@ class Expr:
                     v = Var.get(a.children[0].value, self.parent.cur_routine)
                     if fname in self.parent.routines:
                         if v.type != self.parent.routines[fname].params[i].type:
-                            raise RuntimeError('Parameter type mismatch.')
+                            raise CompileError(EC.PARAM_TYPE_MISMATCH)
                     else:
                         if v.type != self.parent.declared_routines[fname].param_types[i]:
-                            raise RuntimeError('Parameter type mismatch.')
+                            raise CompileError(EC.PARAM_TYPE_MISMATCH)
                     self.instrs += [Instr('pushfp', v)]
                 else:
                     e = Expr(a, self.parent)
@@ -666,7 +778,8 @@ class Compiler:
             _, sub_name, args = ast.children
 
         if sub_name not in self.routines:
-            raise RuntimeError(f'No such sub-routine: {sub_name}')
+            raise CompileError(EC.NO_SUCH_SUB,
+                               f'No such sub-routine: {sub_name}')
 
         i = len(args.children) - 1
         for a in reversed(args.children):
@@ -674,7 +787,7 @@ class Compiler:
                 # just a variable: send byref
                 v = Var.get(a.children[0].value, self.cur_routine)
                 if v.type != self.routines[sub_name].params[i].type:
-                    raise RuntimeError('Parameter type mismatch.')
+                    raise CompileError(EC.PARAM_TYPE_MISMATCH)
                 self.instrs += [Instr('pushfp', v)]
             else:
 
@@ -695,13 +808,13 @@ class Compiler:
 
     def process_declare_stmt(self, ast):
         if self.cur_routine.name != '__main':
-            raise RuntimeError('DECLARE statement only valid in top-level.')
+            raise CompileError(EC.DECL_ONLY_AT_TOP)
 
         _, routine_type, name, params = ast.children
         name = name.value
         if name[-1] in typespec_chars:
             if routine_type == 'sub':
-                raise RuntimeError('Invalid SUB name.')
+                raise CompileError(EC.INVALID_SUB_NAME)
             else:
                 ret_type = Type.from_var_name(name)
                 name = name[:-1]
@@ -728,13 +841,13 @@ class Compiler:
         if name in self.routines:
             defined_param_types = [v.type for v in self.routines[name].params]
             if param_types != defined_param_types:
-                raise RuntimeError('DECLARE statement does not match definition.')
+                raise CompileError(EC.DECL_NOT_MATCH_DEF)
 
         if name in self.declared_routines:
             if self.declared_routines[name].type != routine_type or \
                self.declared_routines[name].ret_type != ret_type or \
                self.declared_routines[name].param_types != param_types:
-                raise RuntimeError('Conflicting DECLARE statements.')
+                raise CompileError(EC.CONFLICTING_DECL)
         else:
             dr = DeclaredRoutine(routine_type, name, param_types, ret_type)
             self.declared_routines[name] = dr
@@ -758,14 +871,14 @@ class Compiler:
         _, var, start, _, end, step, body, next_stmt = ast.children
         var = Var.get(var, self.cur_routine)
         if var.type.typespec == '$':
-            self.error('Invalid FOR variable.')
+            raise CompileError(EC.INVALID_FOR_VAR)
 
         if len(next_stmt.children) == 2:
             # "NEXT var" is used. Check if NEXT variable matches FOR
             # variable.
             next_var = Var.get(next_stmt.children[1], self.cur_routine)
             if next_var != var:
-                self.error('NEXT variable does not match FOR.')
+                raise CompileError(EC.NEXT_VAR_NOT_MATCH_FOR)
 
         step_var = Var.get(self.gen_var('for_step', var.type.typespec), self.cur_routine)
         if step.children:
@@ -804,7 +917,7 @@ class Compiler:
         _, name, params, body, _, _ = ast.children
 
         if name[-1] in typespec_chars:
-            raise RuntimeError('Invalid SUB name.')
+            raise CompileError(EC.INVALID_SUB_NAME)
 
         saved_instrs = self.instrs
         self.instrs = []
@@ -825,7 +938,7 @@ class Compiler:
                 ptype = None
 
             if any(pname == i.name for i in self.cur_routine.local_vars):
-                self.error('Duplicate parameter.')
+                raise CompileError(EC.DUP_PARAM)
 
             var = Var.dim(pname, self.cur_routine, type=ptype, is_param=True, byref=True)
 
@@ -834,8 +947,7 @@ class Compiler:
             r = self.declared_routines[name]
             if r.type != 'sub' or \
                defined_param_types != r.param_types:
-                raise RuntimeError(
-                    'SUB definition does not match previous DECLARE.')
+                raise CompileError(EC.SUB_DEF_NOT_MATCH_DECL)
 
         self.routines[name.value] = self.cur_routine
         self.compile_ast(body)
@@ -877,7 +989,7 @@ class Compiler:
                 ptype = None
 
             if any(pname == i.name for i in self.cur_routine.local_vars):
-                self.error('Duplicate parameter.')
+                raise CompileError(EC.DUP_PARAM)
 
             var = Var.dim(pname, self.cur_routine, type=ptype, is_param=True, byref=True)
 
@@ -901,8 +1013,7 @@ class Compiler:
             defined_param_types = [v.type for v in self.cur_routine.params]
             if defined_param_types != self.declared_routines[name].param_types or \
                ftype != self.declared_routines[name].ret_type:
-                raise RuntimeError(
-                    'FUNCTION definition does not match previous DECLARE.')
+                raise CompileError(EC.FUNC_DEF_NOT_MATCH_DECL)
 
         self.routines[name] = self.cur_routine
         self.compile_ast(body)
@@ -921,7 +1032,7 @@ class Compiler:
         # NEXT statements with a matching FOR will be processed by the
         # process_for_block function. This will only be called when
         # there is a NEXT without FOR.
-        self.error('NEXT without FOR.')
+        raise CompileError('NEXT without FOR.')
 
 
     def process_goto_stmt(self, ast):
@@ -991,8 +1102,9 @@ class Compiler:
     def gen_set_var_code(self, var, expr):
         conv_instrs = gen_conv_instrs(expr.type.typespec, var.type.typespec)
         if conv_instrs == None:
-            self.error('Cannot convert {} to {}.'
-                       .format(expr.type.name, var.type.name))
+            raise CompileError(
+                EC.CANNOT_CONVERT_TYPE,
+                f'Cannot convert {expr.type.name} to {var.type.name}.')
         else:
             self.instrs += expr.instrs + conv_instrs
             self.instrs += var.gen_write_instructions()
@@ -1032,10 +1144,6 @@ class Compiler:
         self.instrs += sum(reversed(parts), []) + \
                        [Instr('pushi%', len(ast.children) - 1)] + \
                        [Instr('syscall', '__print')]
-
-
-    def error(self, msg):
-        raise RuntimeError('COMPILE ERROR: {}'.format(msg))
 
 
     def gen_label(self, prefix):

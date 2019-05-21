@@ -1,4 +1,4 @@
-from compiler import Compiler
+from compiler import Compiler, CompileError
 
 
 with open('qpybasic.ebnf') as f:
@@ -25,8 +25,14 @@ end function
 """
 
 c = Compiler()
-module = c.compile(prog)
+try:
+    module = c.compile(prog)
+except CompileError as e:
+    print('COMPILE ERROR:', e)
+    exit(1)
+
 for i in c.instrs:
     print(i)
+
 with open('foo.mod', 'wb') as f:
     f.write(module.dump())
