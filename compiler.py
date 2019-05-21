@@ -239,7 +239,7 @@ class Var:
                 var.type = routine.dimmed_vars[used_name].type
             else:
                 var.type = get_default_type(used_name)
-                routines.no_type_dimmed.add(var.name)
+                routine.no_type_dimmed.add(var.name)
 
         if var not in routine.params and var not in routine.local_vars:
             var.routine.local_vars.append(var)
