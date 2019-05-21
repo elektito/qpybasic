@@ -937,7 +937,7 @@ class Compiler:
                 pname = p.children[0].value
                 ptype = None
 
-            if any(pname == i.name for i in self.cur_routine.local_vars):
+            if any(pname == i.name for i in self.cur_routine.params):
                 raise CompileError(EC.DUP_PARAM)
 
             var = Var.dim(pname, self.cur_routine, type=ptype, is_param=True, byref=True)
@@ -988,7 +988,7 @@ class Compiler:
                 pname = p.children[0].value
                 ptype = None
 
-            if any(pname == i.name for i in self.cur_routine.local_vars):
+            if any(pname == i.name for i in self.cur_routine.params):
                 raise CompileError(EC.DUP_PARAM)
 
             var = Var.dim(pname, self.cur_routine, type=ptype, is_param=True, byref=True)
