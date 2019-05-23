@@ -1,9 +1,7 @@
 import cmd
 import struct
-import vm
 import asm
-from mmap import mmap
-
+from vm import Machine
 
 class Cmd(cmd.Cmd):
     intro = """
@@ -153,23 +151,9 @@ def main():
     import sys
     filename = sys.argv[1]
 
-    with open(filename, 'rb') as f:
-        print('Reading module file...')
-        module = f.read()
-
-    print('Parsing module...')
-    sections = vm.parse_module(module)
-
-    print('Mapping module memory...')
-    mem = mmap(-1, 4 * 2**30)
-    for t, l, a, data in sections:
-        mem.seek(a)
-        mem.write(data)
-        print(f'Mapped section (type={t}) to address {hex(a)}.')
-
-    machine = vm.Machine(mem)
-
+    machine = Machine.load(sys.argv[1])
     Cmd(machine).cmdloop()
+    machine.shutdown()
 
 
 if __name__ == '__main__':
