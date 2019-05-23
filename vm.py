@@ -544,7 +544,7 @@ class Machine:
         buf = ''
         def print_number(n):
             nonlocal buf
-            if n > 0:
+            if n >= 0:
                 buf += f' {n} '
             else:
                 buf += f'{n} '
