@@ -39,18 +39,18 @@ class Machine:
 
     def step(self):
         def safe_name(s):
-            if s.endswith('%'):
-                return s[:-1] + '_integer'
-            elif s.endswith('&'):
-                return s[:-1] + '_long'
-            elif s.endswith('!'):
-                return s[:-1] + '_single'
-            elif s.endswith('#'):
-                return s[:-1] + '_double'
-            elif s.endswith('$'):
-                return s[:-1] + '_pointer'
-            else:
-                return s
+            for c in '%&!#$':
+                r = {
+                    '%': '_integer',
+                    '&': '_long',
+                    '!': '_single',
+                    '#': '_double',
+                    '$': '_pointer'
+                }[c]
+                s = s.replace(c, r)
+
+            return s
+
         self.mem.seek(self.ip)
         opcode = self.mem.read_byte()
         instr = asm.opcode_to_instr[opcode]
@@ -143,7 +143,7 @@ class Machine:
         return Jump(target)
 
 
-    def exec_conv_int_long(self):
+    def exec_conv_integer_long(self):
         value = self.pop(2)
         value, = struct.unpack('>h', value)
         value = struct.pack('>i', value)
@@ -152,7 +152,7 @@ class Machine:
         return 0
 
 
-    def exec_conv_int_single(self):
+    def exec_conv_integer_single(self):
         value = self.pop(2)
         value, = struct.unpack('>h', value)
         value = struct.pack('>f', value)
