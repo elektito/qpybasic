@@ -166,6 +166,15 @@ class Machine:
         return 0
 
 
+    def exec_conv_integer_double(self):
+        value = self.pop(2)
+        value, = struct.unpack('>h', value)
+        value = struct.pack('>d', value)
+        self.push(value)
+        logger.debug('EXEC: conv%#')
+        return 0
+
+
     def exec_conv_integer_ul(self):
         value = self.pop(2)
         value, = struct.unpack('>h', value)
@@ -192,7 +201,19 @@ class Machine:
             value = -32768
         value = struct.pack('>h', value)
         self.push(value)
-        logger.debug('EXEC: conv%!')
+        logger.debug('EXEC: conv!%')
+        return 0
+
+
+    def exec_conv_single_long(self):
+        value = self.pop(4)
+        value, = struct.unpack('>f', value)
+        value = int(value)
+        if value > 2**31-1 or value < -2**31:
+            value = -2**31
+        value = struct.pack('>i', value)
+        self.push(value)
+        logger.debug('EXEC: conv!&')
         return 0
 
 
@@ -314,6 +335,30 @@ class Machine:
         return 0
 
 
+    def exec_mul_integer(self):
+        y = self.pop(2)
+        x = self.pop(2)
+        y, = struct.unpack('>h', y)
+        x, = struct.unpack('>h', x)
+        result = x * y
+        result = struct.pack('>h', result)
+        self.push(result)
+        logger.debug('EXEC: mul%')
+        return 0
+
+
+    def exec_mul_long(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>i', y)
+        x, = struct.unpack('>i', x)
+        result = x * y
+        result = struct.pack('>i', result)
+        self.push(result)
+        logger.debug('EXEC: mul&')
+        return 0
+
+
     def exec_mul_ul(self):
         y = self.pop(4)
         x = self.pop(4)
@@ -363,7 +408,7 @@ class Machine:
         idx, = struct.unpack('>h', idx)
         addr = self.fp + idx
         self.push(struct.pack('>I', addr))
-        logger.debug('EXEC: pushfp')
+        logger.debug(f'EXEC: pushfp ({hex(addr)})')
         return 2
 
 
@@ -372,6 +417,13 @@ class Machine:
         self.push(value)
         logger.debug('EXEC: pushi%')
         return 2
+
+
+    def exec_pushi_long(self):
+        value = self.mem.read(4)
+        self.push(value)
+        logger.debug('EXEC: pushi&')
+        return 4
 
 
     def exec_pushi_ul(self):
@@ -429,7 +481,16 @@ class Machine:
         self.mem.seek(addr)
         value = self.mem.read(4)
         self.push(value)
-        logger.debug('EXEC: readi4')
+        logger.debug(f'EXEC: readi4 from address {hex(addr)}. got value: {hex(struct.unpack(">I", value)[0])}')
+        return 0
+
+
+    def exec_readi8(self):
+        addr, = struct.unpack('>I', self.pop(4))
+        self.mem.seek(addr)
+        value = self.mem.read(8)
+        self.push(value)
+        logger.debug(f'EXEC: readi8 from address {hex(addr)}. got value: {hex(struct.unpack(">Q", value)[0])}')
         return 0
 
 
@@ -479,6 +540,20 @@ class Machine:
         result = struct.pack('>h', result)
         self.push(result)
         logger.debug('EXEC: sub%')
+        return 0
+
+
+    def exec_sub_long(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>i', y)
+        x, = struct.unpack('>i', x)
+        result = x - y
+        if result > 2**31-1 or result < -2**31:
+            result = -2**31
+        result = struct.pack('>i', result)
+        self.push(result)
+        logger.debug(f'EXEC: sub& ({x} - {y} = {struct.unpack(">i", result)[0]})')
         return 0
 
 
@@ -569,12 +644,30 @@ class Machine:
         return 2
 
 
+    def exec_writei2(self):
+        addr, = struct.unpack('>I', self.pop(4))
+        value = self.pop(2)
+        self.mem.seek(addr)
+        self.mem.write(value)
+        logger.debug(f'EXEC: writei2 from address {hex(addr)}. wrote value: {hex(struct.unpack(">H", value)[0])}')
+        return 0
+
+
     def exec_writei4(self):
         addr, = struct.unpack('>I', self.pop(4))
         value = self.pop(4)
         self.mem.seek(addr)
         self.mem.write(value)
-        logger.debug('EXEC: writei4')
+        logger.debug(f'EXEC: writei4 from address {hex(addr)}. wrote value: {hex(struct.unpack(">I", value)[0])}')
+        return 0
+
+
+    def exec_writei8(self):
+        addr, = struct.unpack('>I', self.pop(4))
+        value = self.pop(8)
+        self.mem.seek(addr)
+        self.mem.write(value)
+        logger.debug(f'EXEC: writei8 from address {hex(addr)}. wrote value: {hex(struct.unpack(">Q", value)[0])}')
         return 0
 
 
