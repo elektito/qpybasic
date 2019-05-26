@@ -118,6 +118,11 @@ class ErrorCodes(IntEnum):
     NO_SUCH_SUB = 20
     INVALID_NUM_LITERAL = 21
     CANNOT_CONVERT_TYPE = 22
+    SUBSCRIPT_OUT_OF_RANGE = 23
+    NOT_AN_ARRAY = 24
+    WRONG_NUMBER_OF_DIMENSIONS = 25
+    TYPE_MISMATCH = 26
+    INVALID_LVALUE = 27
 
 
     def __str__(self):
@@ -187,6 +192,21 @@ class ErrorCodes(IntEnum):
 
             self.CANNOT_CONVERT_TYPE:
             'Cannot convert type.',
+
+            self.SUBSCRIPT_OUT_OF_RANGE:
+            'Subscript out of range',
+
+            self.NOT_AN_ARRAY:
+            'Not an array',
+
+            self.WRONG_NUMBER_OF_DIMENSIONS:
+            'Wrong number of dimensions',
+
+            self.TYPE_MISMATCH:
+            'Type mismatch',
+
+            self.INVALID_LVALUE:
+            'Invalid L-Value'
         }.get(int(self), super().__str__())
 
 
@@ -205,13 +225,13 @@ class CompileError(Exception):
 
 
 class Type:
-    def __init__(self, name, *, is_array=False):
+    def __init__(self, name, *, dimensions=None):
         if name in typespec_chars:
             self.name = typespec_to_typename[name]
         else:
             self.name = name.upper()
 
-        self.is_array = is_array
+        self.dimensions = dimensions
 
 
     @property
@@ -236,16 +256,39 @@ class Type:
         ]
 
 
+    @property
+    def is_numeric(self):
+        numeric_types = [
+            'INTEGER',
+            'LONG',
+            'SINGLE',
+            'DOUBLE',
+        ]
+        return self.name in numeric_types and self.dimensions == None
+
+    @property
+    def is_array(self):
+        return self.dimensions != None
+
+
     def get_size(self):
-        # user-defined types and arrays not supported yet
-        assert self.is_basic and not self.is_array
+        if self.dimensions:
+            array_size = 1
+            for d_from, d_to in self.dimensions:
+                array_size *= d_to - d_from + 1
+        else:
+            array_size = 1
         return {
             'INTEGER': 2,
             'LONG': 4,
             'SINGLE': 4,
             'DOUBLE': 8,
             'STRING': 4,
-        }[self.name]
+        }[self.name] * array_size
+
+
+    def get_base_type(self):
+        return Type(self.name)
 
 
     def __repr__(self):
@@ -253,7 +296,15 @@ class Type:
             name = f'User-Defined: {self.name}'
         else:
             name = self.name
-        suffix = '()' if self.is_array else ''
+        if self.dimensions:
+            suffix = '('
+            for d_from, d_to in self.dimensions:
+                if suffix != '(':
+                    suffix += ', '
+                suffix += f'{d_from} TO {d_to}'
+            suffix += ')'
+        else:
+            suffix = ''
         return f'<Type {name}{suffix}>'
 
 
@@ -276,22 +327,6 @@ class Type:
 
 
 class Var:
-    def gen_read_instructions(self):
-        if self.byref:
-            return [Instr(f'readf4', self),
-                    Instr(f'readi{self.type.get_size()}')]
-        else:
-            return [Instr(f'readf{self.type.get_size()}', self)]
-
-
-    def gen_write_instructions(self):
-        if self.byref:
-            return [Instr(f'readf4', self),
-                    Instr(f'writei{self.size}')]
-        else:
-            return [Instr(f'writef{self.size}', self)]
-
-
     @property
     def size(self):
         if self.byref:
@@ -312,10 +347,140 @@ class Var:
 
     def __repr__(self):
         pass_type = ' BYREF' if self.byref else ''
+        dims = '()' if self.type.is_array else ''
         if hasattr(self, 'idx'):
-            return f'<Var {self.name}{self.type.typespec} idx={self.idx}{pass_type}>'
+            return f'<Var {self.name}{self.type.typespec}{dims} idx={self.idx}{pass_type}>'
         else:
-            return f'<Var {self.name}{self.type.typespec}{pass_type}>'
+            return f'<Var {self.name}{self.type.typespec}{dims}{pass_type}>'
+
+
+class Lvalue:
+    def __init__(self, args):
+        if len(args) == 1:
+            # a simple variable
+            self.base = args[0]
+            self.ops = []
+            self.type = self.base.type
+        else:
+            # an index into an array
+            array, op, indices = args
+            assert all(isinstance(a, Expr) for a in indices)
+
+            self.base = array
+            assert op == 'IDX'
+            self.ops = [('IDX', indices)]
+            self.type = self.base.type.get_base_type()
+
+            if not self.base.type.is_array:
+                # error out for now, but qbasic creates an implicit
+                # array in such a situation.
+                raise CompileError(EC.NOT_AN_ARRAY)
+            elif len(indices) != len(self.base.type.dimensions):
+                raise CompileError(EC.WRONG_NUMBER_OF_DIMENSIONS)
+            elif any(not i.type.is_numeric for i in indices):
+                raise CompileError(EC.TYPE_MISMATCH)
+
+        assert isinstance(self.base, Var)
+
+
+    def get_instrs_for_idx(self, base, indices):
+        # this function calculates the byte-offset indicated by the
+        # given indices into the array 'base'. we start from the last
+        # index, and work backwards. for the last, we just add the
+        # index value. for the one before that, we multiply the size
+        # of the last dimension by the value and then add it to what
+        # we had in the previous step. this will continue until the
+        # first index.
+        #
+        # for the array:
+        #    arr(n1 TO m1, n2 TO m2, n3 TO m3)
+        # when trying to access arr(x, y, z) the offset would be:
+        #    offset = (z - n3) + (y - n2) * (m3 - n3 + 1) + (x - n1) * (m3 - n3 + 1) * (m2 - n2 + 1)
+        #    offset *= size_of_cell_type
+        #
+        # as a more concrete example, for this array:
+        #    DIM arr(1 TO 5, 1 TO 5) AS LONG
+        # when accessing arr(5, 5):
+        #    offset = 4 + 5 * 4 => 24
+        #    offset *= 4        => 96
+        # given that the array has 100 cells, and (5, 5) is the last
+        # 4-byte cell, the offset 96 calculated is indeed correct.
+
+        base_size = base.type.get_base_type().get_size()
+        instrs = []
+
+        # push last offset first
+        instrs += indices[-1].instrs
+        t = indices[-1].type.typespec
+        instrs += [Instr(f'conv{t}_ul')]
+        d_from, d_to = base.type.dimensions[-1]
+        if d_from != 0:
+            instrs += [Instr('pushi_ul', d_from),
+                       Instr('sub_ul')]
+
+        # now add the offsets for the higher dimensions
+        dim_size = 1
+        for i, (d_from, d_to) in enumerate(base.type.dimensions[:-1]):
+            dim_size *= (d_to - d_from + 1)
+            instrs += [Instr('pushi_ul', dim_size)]
+            instrs += indices[i].instrs
+            t = indices[i].type.typespec
+            instrs += [Instr(f'conv{t}_ul')]
+
+            instrs += [Instr('pushi_ul', d_from),
+                       Instr('sub_ul')]
+
+            instrs += [Instr('mul_ul'),
+                       Instr('add_ul')]
+
+        instrs += [Instr('pushi_ul', base.type.get_base_type().get_size()),
+                   Instr('mul_ul')]
+
+        return instrs
+
+
+    def gen_read_instructions(self):
+        base_size = self.base.type.get_base_type().get_size()
+        if self.ops == []:
+            if self.base.byref:
+                instrs = [Instr('readf4', self.base),
+                          Instr(f'readi{base_size}')]
+            else:
+                instrs = [Instr(f'readf{base_size}', self.base)]
+        else:
+            if self.base.byref:
+                instrs = [Instr('readf4', self.base)]
+            else:
+                instrs = [Instr('pushfp', self.base)]
+
+            indices = self.ops[0][1]
+            instrs += self.get_instrs_for_idx(self.base, indices)
+            instrs += [Instr('add_ul')]
+            instrs += [Instr(f'readi{base_size}')]
+
+        return instrs
+
+
+    def gen_write_instructions(self):
+        base_size = self.base.type.get_base_type().get_size()
+        if self.ops == []:
+            if self.base.byref:
+                instrs = [Instr('readf4', self.base),
+                          Instr(f'writei{base_size}')]
+            else:
+                instrs = [Instr(f'writef{base_size}', self.base)]
+        else:
+            if self.base.byref:
+                instrs = [Instr('readf4', self.base)]
+            else:
+                instrs = [Instr('pushfp', self.base)]
+
+            indices = self.ops[0][1]
+            instrs += self.get_instrs_for_idx(self.base, indices)
+            instrs += [Instr('add_ul')]
+            instrs += [Instr(f'writei{base_size}')]
+
+        return instrs
 
 
 class Routine:
@@ -463,16 +628,22 @@ class Expr:
 
             i = len(args) - 1
             for a in reversed(args):
-                if isinstance(a, Tree) and a.data == 'value' and a.children[0].type == 'ID':
-                    # just a variable: send byref
-                    v = self.parent.get_var(a.children[0].value)
+                lv = None
+                if isinstance(a, Tree) and \
+                   a.data == 'value' and \
+                   isinstance(a.children[0], Tree) and \
+                   a.children[0].data == 'possibly_lvalue':
+                    lv = self.parent.create_lvalue_if_possible(a.children[0])
+
+                if isinstance(lv, Lvalue):
+                    # an lvalue: send byref
                     if fname in self.parent.routines:
-                        if v.type != self.parent.routines[fname].params[i].type:
+                        if lv.type != self.parent.routines[fname].params[i].type:
                             raise CompileError(EC.PARAM_TYPE_MISMATCH)
                     else:
-                        if v.type != self.parent.declared_routines[fname].param_types[i]:
+                        if lv.type != self.parent.declared_routines[fname].param_types[i]:
                             raise CompileError(EC.PARAM_TYPE_MISMATCH)
-                    self.instrs += [Instr('pushfp', v)]
+                    self.instrs += lv.gen_write_byref_instructions()
                 else:
                     e = Expr(a, self.parent)
                     if fname in self.parent.routines:
@@ -490,13 +661,13 @@ class Expr:
 
     def process_value(self, ast):
         v = ast.children[0]
-        if v.type == 'ID': # variable or function call
-            if self.parent.is_function(v):
-                self.process_function_call(ast)
+        if isinstance(v, Tree):
+            lv = self.parent.create_lvalue_if_possible(ast.children[0])
+            if lv:
+                self.instrs += lv.gen_read_instructions()
+                self.type = lv.type
             else:
-                var = self.parent.get_var(v)
-                self.instrs += var.gen_read_instructions()
-                self.type = var.type
+                self.process_function_call(ast.children[0])
         elif v.type == 'STRING_LITERAL':
             self.parent.add_string_literal(v[1:-1])
             self.instrs += [Instr('pushi$', v.value)]
@@ -641,6 +812,7 @@ class Compiler:
         self.endif_labels = []
         self.string_literals = {}
         self.last_string_literal_idx = 0
+        self.default_array_base = 1
 
         # map the names of declared subs/functions to a
         # DeclaredRoutine object which contains parameter types and
@@ -697,6 +869,15 @@ class Compiler:
             sub_name, args = ast.children
         else:
             _, sub_name, args = ast.children
+
+        # due to some grammar conflicts, we're using a
+        # 'possibly_lvalue' as the sub name (instead of the more
+        # sensible ID). so here, we check whether it is in fact
+        # actually an ID.
+        if len(sub_name.children) != 1 or sub_name.children[0].type != 'ID':
+            raise CompileError(EC.NO_SUCH_SUB)
+        else:
+            sub_name = sub_name.children[0].value
 
         if sub_name not in self.routines:
             raise CompileError(EC.NO_SUCH_SUB,
@@ -779,9 +960,34 @@ class Compiler:
             _, name = ast.children
             self.dim_var(name)
         else:
-            _, name, _, typename = ast.children
+            _, name, dimensions,  _, typename = ast.children
+            if dimensions.children:
+                dimensions = self.parse_dimensions(dimensions)
+            else:
+                dimensions = None
             typename = typename.children[0].value
-            self.dim_var(name, type=Type(typename))
+            self.dim_var(name, type=Type(typename, dimensions=dimensions),
+                         dimensions=dimensions)
+
+
+    def parse_dimensions(self, ast):
+        dimensions = []
+
+        for d in ast.children:
+            if len(d.children) == 1:
+                d_from = self.default_array_base
+                d_to = d.children[0]
+            else:
+                d_from, _, d_to = d.children
+
+            d_from, d_to = int(d_from), int(d_to)
+
+            if d_to < d_from:
+                raise CompileError(EC.SUBSCRIPT_OUT_OF_RANGE)
+
+            dimensions.append((d_from, d_to))
+
+        return dimensions
 
 
     def process_end_stmt(self, ast):
@@ -806,8 +1012,8 @@ class Compiler:
             e = Expr(step.children[1], self)
             self.gen_set_var_code(step_var, e)
         else:
-            self.instrs += [Instr(f'pushi{var.type.typespec}', 1),
-                            Instr(f'writef{var.size}', step_var)]
+            self.instrs += [Instr(f'pushi{var.type.typespec}', 1)]
+            self.instrs += Lvalue([step_var]).gen_write_instructions()
 
         end_var = self.get_var(self.gen_var('for_end', var.type.typespec))
         e = Expr(end, self)
@@ -828,9 +1034,9 @@ class Compiler:
         self.compile_ast(body)
         self.instrs += [Instr(f'readf{var.size}', var),
                         Instr(f'readf{step_var.size}', step_var),
-                        Instr(f'add{var.type.typespec}'),
-                        Instr(f'writef{var.size}', var),
-                        Instr('jmp', top_label),
+                        Instr(f'add{var.type.typespec}')]
+        self.instrs += Lvalue([var]).gen_write_instructions()
+        self.instrs += [Instr('jmp', top_label),
                         Label(end_label)]
 
 
@@ -924,11 +1130,10 @@ class Compiler:
 
         # initialize the return variable.
         if ftype.name == 'STRING':
-            self.instrs += [Instr(f'pushi$'), '""',
-                            Instr(f'writef4', ret_var)]
+            self.instrs += [Instr(f'pushi$'), '""']
         else:
-            self.instrs += [Instr(f'pushi{ftype.typespec}', 0),
-                            Instr(f'writef{ftype.get_size()}', ret_var)]
+            self.instrs += [Instr(f'pushi{ftype.typespec}', 0)]
+        self.instrs += Lvalue([ret_var]).gen_write_instructions()
 
         if name in self.declared_routines:
             defined_param_types = [v.type for v in self.cur_routine.params]
@@ -1014,10 +1219,24 @@ class Compiler:
             # cut the LET keyword
             ast.children = ast.children[1:]
 
-        var, expr = ast.children
-        var = self.get_var(var)
+        dest, expr = ast.children
+        lv = self.create_lvalue_if_possible(dest)
+        if lv == None:
+            if dest.data == 'var_or_no_arg_func':
+                # this is for the case of assigning to the function
+                # name in functions.
+                name = dest.children[0].value
+                var = self.get_var(name)
+                lv = Lvalue([var])
+
+        if lv == None:
+            raise CompileError(EC.INVALID_LVALUE)
+
         expr = Expr(expr, self)
-        self.gen_set_var_code(var, expr)
+        self.instrs += expr.instrs
+        if expr.type != lv.type:
+            self.instrs += gen_conv_instrs(expr.type.typespec, lv.type.typespec)
+        self.instrs += lv.gen_write_instructions()
 
 
     def gen_set_var_code(self, var, expr):
@@ -1028,7 +1247,27 @@ class Compiler:
                 f'Cannot convert {expr.type.name} to {var.type.name}.')
         else:
             self.instrs += expr.instrs + conv_instrs
-            self.instrs += var.gen_write_instructions()
+
+            lv = Lvalue([var])
+            self.instrs += lv.gen_write_instructions()
+
+
+    def create_lvalue_if_possible(self, ast):
+        # this function receive a tree for the 'possibly_lvalue' rule,
+        # and attempts to create an lvalue from it. if not possible,
+        # None is returned.
+        name = ast.children[0].value
+        if self.is_function(name):
+            return None
+        else:
+            var = self.get_var(name)
+            if ast.data == 'var_or_no_arg_func':
+                lv = Lvalue([var])
+            else:
+                args = [Expr(i, self) for i in ast.children[1].children]
+                lv = Lvalue([var, 'IDX', args])
+
+            return lv
 
 
     def process_print_stmt(self, ast):
@@ -1106,7 +1345,7 @@ class Compiler:
                 if r.type == 'function')
 
     def dim_var(self, used_name, *,
-                klass='local', byref=False, type=None):
+                klass='local', byref=False, type=None, dimensions=None):
         assert klass in ['local', 'param']
         assert klass == 'param' or not byref
 
@@ -1117,10 +1356,12 @@ class Compiler:
             if type:
                 raise CompileError(EC.INVALID_VAR_NAME)
 
-            type = Type(typespec)
+            type = Type(typespec, dimensions=dimensions)
         else:
             name = used_name
             typespec = None
+            if not type:
+                type = get_default_type(used_name)
 
         containers = [self.cur_routine]
         for c in containers:

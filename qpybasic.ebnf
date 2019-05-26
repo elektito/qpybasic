@@ -73,7 +73,7 @@ _block_body_item: block _NEWLINE
                 | _line _NEWLINE
                 | _NEWLINE
 
-call_stmt: ID argument_list
+call_stmt: possibly_lvalue argument_list
          | CALL_KW ID "(" argument_list ")"
 
 argument_list: expr ("," expr)*
@@ -83,13 +83,18 @@ cls_stmt: CLS_KW
 
 declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) ID parameter_list
 
-dim_stmt: DIM_KW ID [AS_KW typename]
+dim_stmt: DIM_KW ID dimensions [AS_KW typename]
+
+dimensions: "(" dimension ("," dimension)* ")"
+          |
+
+dimension: NUMERIC_LITERAL [TO_KW NUMERIC_LITERAL]
 
 end_stmt: END_CMD
 
 goto_stmt: GOTO_KW (ID | NUMERIC_LITERAL)
 
-let_stmt: LET_KW? ID "=" expr
+let_stmt: LET_KW? possibly_lvalue "=" expr
 
 print_stmt: PRINT_KW (expr _print_sep)* expr
           | PRINT_KW expr [_print_sep]
@@ -120,8 +125,10 @@ _print_sep: SEMICOLON
 
 value: NUMERIC_LITERAL
      | STRING_LITERAL
-     | ID
-     | ID "(" argument_list ")"  -> function_call
+     | possibly_lvalue
+
+possibly_lvalue: ID                        -> var_or_no_arg_func
+               | ID "(" argument_list ")"  -> func_call_or_idx
 
 _NEWLINE: "\n"
         | "\r\n"
