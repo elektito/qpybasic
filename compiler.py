@@ -483,6 +483,21 @@ class Lvalue:
         return instrs
 
 
+    def gen_ref_instructions(self):
+        # generate instructions that put the address of the lvalue on
+        # the stack.
+        if self.base.byref:
+            instrs = [Instr('readf4', self.base)]
+        else:
+            instrs = [Instr('pushfp', self.base)]
+        if self.ops != []:
+            indices = self.ops[0][1]
+            instrs += self.get_instrs_for_idx(self.base, indices)
+            instrs += [Instr('add_ul')]
+
+        return instrs
+
+
 class Routine:
     def __init__(self, name, type):
         self.name = name
@@ -632,7 +647,7 @@ class Expr:
                 if isinstance(a, Tree) and \
                    a.data == 'value' and \
                    isinstance(a.children[0], Tree) and \
-                   a.children[0].data == 'possibly_lvalue':
+                   a.children[0].data == 'var_or_no_arg_func':
                     lv = self.parent.create_lvalue_if_possible(a.children[0])
 
                 if isinstance(lv, Lvalue):
@@ -643,7 +658,7 @@ class Expr:
                     else:
                         if lv.type != self.parent.declared_routines[fname].param_types[i]:
                             raise CompileError(EC.PARAM_TYPE_MISMATCH)
-                    self.instrs += lv.gen_write_byref_instructions()
+                    self.instrs += lv.gen_ref_instructions()
                 else:
                     e = Expr(a, self.parent)
                     if fname in self.parent.routines:
@@ -885,16 +900,28 @@ class Compiler:
 
         i = len(args.children) - 1
         for a in reversed(args.children):
-            if isinstance(a, Tree) and a.data == 'value' and a.children[0].type == 'ID':
-                # just a variable: send byref
-                v = self.get_var(a.children[0].value)
-                if v.type != self.routines[sub_name].params[i].type:
-                    raise CompileError(EC.PARAM_TYPE_MISMATCH)
-                self.instrs += [Instr('pushfp', v)]
-            else:
+            lv = None
+            if isinstance(a, Tree) and \
+               a.data == 'value' and \
+               isinstance(a.children[0], Tree) and \
+               a.children[0].data == 'var_or_no_arg_func':
+                lv = self.create_lvalue_if_possible(a.children[0])
 
+            if isinstance(lv, Lvalue):
+                # just a variable: send byref
+                if sub_name in self.routines:
+                    if lv.type != self.routines[sub_name].params[i].type:
+                        raise CompileError(EC.PARAM_TYPE_MISMATCH)
+                else:
+                    if lv.type != self.declared_routines[sub_name].param_types[i]:
+                        raise CompileError(EC.PARAM_TYPE_MISMATCH)
+                self.instrs += lv.gen_ref_instructions()
+            else:
                 e = Expr(a, self)
-                typespec = self.routines[sub_name].params[i].type.typespec
+                if sub_name in self.routines:
+                    typespec = self.routines[sub_name].params[i].type.typespec
+                else:
+                    typespec = self.declared_routines[sub_name].param_types[i].typespec
                 v = self.get_var(self.gen_var('rvalue', typespec))
                 self.gen_set_var_code(v, e)
                 self.instrs += [Instr('pushfp', v)]
