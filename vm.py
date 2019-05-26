@@ -119,7 +119,21 @@ class Machine:
             result = -2**31
         result = struct.pack('>i', result)
         self.push(result)
-        logger.debug('EXEC: add&')
+        logger.debug(f'EXEC: add& ({x} + {y} = {struct.unpack(">i", result)[0]})')
+        return 0
+
+
+    def exec_add_ul(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>I', y)
+        x, = struct.unpack('>I', x)
+        result = x + y
+        if result >= 2**32:
+            result = 2**32 - 1
+        result = struct.pack('>I', result)
+        self.push(result)
+        logger.debug(f'EXEC: add_ul ({hex(x)} + {hex(y)} = {hex(struct.unpack(">I", result)[0])})')
         return 0
 
 
@@ -152,6 +166,15 @@ class Machine:
         return 0
 
 
+    def exec_conv_integer_ul(self):
+        value = self.pop(2)
+        value, = struct.unpack('>h', value)
+        value = struct.pack('>I', value)
+        self.push(value)
+        logger.debug('EXEC: conv%_ul')
+        return 0
+
+
     def exec_conv_integer_single(self):
         value = self.pop(2)
         value, = struct.unpack('>h', value)
@@ -170,6 +193,20 @@ class Machine:
         value = struct.pack('>h', value)
         self.push(value)
         logger.debug('EXEC: conv%!')
+        return 0
+
+
+    def exec_conv_single_ul(self):
+        value = self.pop(4)
+        value, = struct.unpack('>f', value)
+        value = int(value)
+        if value >= 2**32:
+            value = 2**32 - 1
+        elif value < 0:
+            value = 0
+        value = struct.pack('>I', value)
+        self.push(value)
+        logger.debug('EXEC: conv!_ul')
         return 0
 
 
@@ -277,6 +314,18 @@ class Machine:
         return 0
 
 
+    def exec_mul_ul(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>I', y)
+        x, = struct.unpack('>I', x)
+        result = x * y
+        result = struct.pack('>I', result)
+        self.push(result)
+        logger.debug(f'EXEC: mul_ul ({hex(x)} * {hex(y)} = {hex(struct.unpack(">I", result)[0])})')
+        return 0
+
+
     def exec_mul_single(self):
         y = self.pop(4)
         x = self.pop(4)
@@ -323,6 +372,13 @@ class Machine:
         self.push(value)
         logger.debug('EXEC: pushi%')
         return 2
+
+
+    def exec_pushi_ul(self):
+        value = self.mem.read(4)
+        self.push(value)
+        logger.debug('EXEC: pushi_ul')
+        return 4
 
 
     def exec_pushi_single(self):
@@ -423,6 +479,20 @@ class Machine:
         result = struct.pack('>h', result)
         self.push(result)
         logger.debug('EXEC: sub%')
+        return 0
+
+
+    def exec_sub_ul(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>I', y)
+        x, = struct.unpack('>I', x)
+        result = x - y
+        if result < 0:
+            result = 0
+        result = struct.pack('>I', result)
+        self.push(result)
+        logger.debug(f'EXEC: sub_ul ({x} - {y} = {struct.unpack(">I", result)[0]})')
         return 0
 
 

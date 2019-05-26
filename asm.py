@@ -87,6 +87,9 @@ IMM_SINGLE = Operand('f', 'float')
 # A double-precision (64-bit) floating point immediate value.
 IMM_DOUBLE = Operand('d', 'float')
 
+# A unsigned, 32-bit long immediate value.
+IMM_UL = Operand('i', 'hex4')
+
 
 class Instr:
     """An instance of this class, is a representation of an instruction in
@@ -126,7 +129,10 @@ use, i.e. the instruction itself, plus the values of its arguments.
 
     def __str__(self):
         args = ', '.join(str(i) for i in self.operands)
-        return f'\t{self.name}\t{args}'
+        if len(self.name) >= 8:
+            return f'\t{self.name}\t{args}'
+        else:
+            return f'\t{self.name}\t\t{args}'
 
 
 class Instruction:
@@ -239,5 +245,18 @@ def_instr(0x46, 'sgn%', stack=0)
 def_instr(0x47, 'sgn&', stack=-2)
 def_instr(0x48, 'sgn!', stack=-2)
 def_instr(0x49, 'sgn#', stack=-6)
-def_instr(0x4b, 'ret_r', SIZE, SIZE, stack='-4 - op1')
-def_instr(0x4a, 'unframe_r', SIZE, FIDX, SIZE)
+def_instr(0x4a, 'ret_r', SIZE, SIZE, stack='-4 - op1')
+def_instr(0x4b, 'unframe_r', SIZE, FIDX, SIZE)
+def_instr(0x4c, 'pushi_ul', IMM_UL, stack=4)
+def_instr(0x4d, 'add_ul', stack=-4)
+def_instr(0x4e, 'sub_ul', stack=-4)
+def_instr(0x4f, 'mul_ul', stack=-4)
+def_instr(0x50, 'div_ul', stack=-4)
+def_instr(0x51, 'conv%_ul', stack=2)
+def_instr(0x52, 'conv&_ul', stack=0)
+def_instr(0x53, 'conv!_ul', stack=0)
+def_instr(0x54, 'conv#_ul', stack=-4)
+def_instr(0x55, 'conv_ul%', stack=-2)
+def_instr(0x56, 'conv_ul&', stack=0)
+def_instr(0x57, 'conv_ul!', stack=0)
+def_instr(0x58, 'conv_ul#', stack=4)
