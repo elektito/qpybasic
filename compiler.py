@@ -647,7 +647,7 @@ class Expr:
                 if isinstance(a, Tree) and \
                    a.data == 'value' and \
                    isinstance(a.children[0], Tree) and \
-                   a.children[0].data == 'var_or_no_arg_func':
+                   a.children[0].data in ['var_or_no_arg_func', 'func_call_or_idx']:
                     lv = self.parent.create_lvalue_if_possible(a.children[0])
 
                 if isinstance(lv, Lvalue):
@@ -904,7 +904,7 @@ class Compiler:
             if isinstance(a, Tree) and \
                a.data == 'value' and \
                isinstance(a.children[0], Tree) and \
-               a.children[0].data == 'var_or_no_arg_func':
+               a.children[0].data in ['var_or_no_arg_func', 'func_call_or_idx']:
                 lv = self.create_lvalue_if_possible(a.children[0])
 
             if isinstance(lv, Lvalue):
