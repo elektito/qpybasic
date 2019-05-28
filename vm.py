@@ -467,6 +467,18 @@ class Machine:
         return 2
 
 
+    def exec_readf_n(self):
+        size = self.mem.read(2)
+        size, = struct.unpack('>H', size)
+        idx = self.mem.read(2)
+        idx, = struct.unpack('>h', idx)
+        self.mem.seek(self.fp + idx)
+        value = self.mem.read(size)
+        self.push(value)
+        logger.debug('EXEC: readf_n')
+        return 4
+
+
     def exec_readi2(self):
         addr, = struct.unpack('>I', self.pop(4))
         self.mem.seek(addr)
@@ -644,6 +656,18 @@ class Machine:
         return 2
 
 
+    def exec_writef_n(self):
+        size = self.mem.read(2)
+        size, = struct.unpack('>H', size)
+        idx = self.mem.read(2)
+        idx, = struct.unpack('>h', idx)
+        value = self.pop(size)
+        self.mem.seek(self.fp + idx)
+        self.mem.write(value)
+        logger.debug('EXEC: writef_n')
+        return 4
+
+
     def exec_writei2(self):
         addr, = struct.unpack('>I', self.pop(4))
         value = self.pop(2)
@@ -669,6 +693,17 @@ class Machine:
         self.mem.write(value)
         logger.debug(f'EXEC: writei8 from address {hex(addr)}. wrote value: {hex(struct.unpack(">Q", value)[0])}')
         return 0
+
+
+    def exec_writei_n(self):
+        size = self.mem.read(2)
+        size, = struct.unpack('>H', size)
+        addr, = struct.unpack('>I', self.pop(4))
+        value = self.pop(size)
+        self.mem.seek(addr)
+        self.mem.write(value)
+        logger.debug(f'EXEC: writei_n')
+        return 2
 
 
     def pop(self, size):

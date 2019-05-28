@@ -24,6 +24,10 @@ typespec_to_typename = {
     '$': 'STRING',
 }
 
+lvalue_aliases = ['var_or_no_arg_func',
+                  'func_call_or_idx',
+                  'dotted']
+
 
 def get_type_name(typespec):
     return {
@@ -36,12 +40,17 @@ def get_type_name(typespec):
 
 
 def gen_conv_instrs(t1, t2):
+    assert isinstance(t1, Type)
+    assert isinstance(t2, Type)
+
     if t1 == t2:
         return []
-    elif t1 in '%&!#' and t2 in '%&!#':
-        return [Instr('conv' + t1 + t2)]
-    else:
+    elif not t1.is_basic or not t2.is_basic:
         return None
+    elif not t1.is_numeric or not t2.is_numeric:
+        return None
+    else:
+        return [Instr('conv' + t1.typespec + t2.typespec)]
 
 
 def get_literal_type(literal):
@@ -123,6 +132,11 @@ class ErrorCodes(IntEnum):
     WRONG_NUMBER_OF_DIMENSIONS = 25
     TYPE_MISMATCH = 26
     INVALID_LVALUE = 27
+    INVALID_TYPE_NAME = 30
+    ELEMENT_NOT_DEFINED = 31
+    UNDEFINED_TYPE = 32
+    INVALID_OPERATION = 33
+    INVALID_USE_OF_DOT = 34
 
 
     def __str__(self):
@@ -206,7 +220,22 @@ class ErrorCodes(IntEnum):
             'Type mismatch',
 
             self.INVALID_LVALUE:
-            'Invalid L-Value'
+            'Invalid L-Value',
+
+            self.INVALID_TYPE_NAME:
+            'Invalid TYPE name',
+
+            self.ELEMENT_NOT_DEFINED:
+            'Element not defined',
+
+            self.UNDEFINED_TYPE:
+            'Undefined type.',
+
+            self.INVALID_OPERATION:
+            'Invalid operation',
+
+            self.INVALID_USE_OF_DOT:
+            'Invalid use of DOT',
         }.get(int(self), super().__str__())
 
 
@@ -225,13 +254,24 @@ class CompileError(Exception):
 
 
 class Type:
-    def __init__(self, name, *, dimensions=None):
+    basic_types = [
+        'INTEGER',
+        'LONG',
+        'SINGLE',
+        'DOUBLE',
+        'STRING'
+    ]
+
+    def __init__(self, name, *, dimensions=None, elements=None):
         if name in typespec_chars:
             self.name = typespec_to_typename[name]
         else:
             self.name = name.upper()
 
         self.dimensions = dimensions
+        self.elements = elements
+
+        assert self.name in self.basic_types or self.elements
 
 
     @property
@@ -247,13 +287,7 @@ class Type:
 
     @property
     def is_basic(self):
-        return self.name in [
-            'INTEGER',
-            'LONG',
-            'SINGLE',
-            'DOUBLE',
-            'STRING'
-        ]
+        return self.name in self.basic_types
 
 
     @property
@@ -278,17 +312,23 @@ class Type:
                 array_size *= d_to - d_from + 1
         else:
             array_size = 1
-        return {
-            'INTEGER': 2,
-            'LONG': 4,
-            'SINGLE': 4,
-            'DOUBLE': 8,
-            'STRING': 4,
-        }[self.name] * array_size
+
+        if self.is_basic:
+            return {
+                'INTEGER': 2,
+                'LONG': 4,
+                'SINGLE': 4,
+                'DOUBLE': 8,
+                'STRING': 4,
+            }[self.name] * array_size
+        else:
+            base_size = sum(e_type.get_size()
+                            for e_name, e_type in self.elements)
+            return array_size * base_size
 
 
-    def get_base_type(self):
-        return Type(self.name)
+    def get_base_type_name(self):
+        return self.name
 
 
     def __repr__(self):
@@ -355,42 +395,53 @@ class Var:
 
 
 class Lvalue:
-    def __init__(self, args):
-        if len(args) == 1:
-            # a simple variable
-            self.base = args[0]
-            self.ops = []
-            self.type = self.base.type
-        else:
-            # an index into an array
-            array, op, indices = args
-            assert all(isinstance(a, Expr) for a in indices)
+    def __init__(self, lv_list, *, compiler=None):
+        assert lv_list
 
-            self.base = array
-            assert op == 'IDX'
-            self.ops = [('IDX', indices)]
-            self.type = self.base.type.get_base_type()
+        self.compiler = compiler
 
-            if not self.base.type.is_array:
-                # error out for now, but qbasic creates an implicit
-                # array in such a situation.
-                raise CompileError(EC.NOT_AN_ARRAY)
-            elif len(indices) != len(self.base.type.dimensions):
-                raise CompileError(EC.WRONG_NUMBER_OF_DIMENSIONS)
-            elif any(not i.type.is_numeric for i in indices):
-                raise CompileError(EC.TYPE_MISMATCH)
+        self.base = lv_list[0]
+        self.ops = lv_list[1:]
 
-        assert isinstance(self.base, Var)
+        # convert the list of operations into groups of two, like:
+        # [('IDX', args), ('DOT', element), ('DOT', element)]
+        self.ops = list(zip(self.ops[::2], self.ops[1::2]))
+
+        self.set_type()
 
 
-    def get_instrs_for_idx(self, base, indices):
+    def set_type(self):
+        # set self.type based on self.base and self.ops
+
+        t = self.base.type
+
+        for op, arg in self.ops:
+            if op == 'IDX':
+                t = self.compiler.get_type(t.get_base_type_name())
+            elif op == 'DOT':
+                type_elements = self.compiler.user_defined_types.get(t.name)
+                if not type_elements:
+                    raise CompileError(EC.INVALID_USE_OF_DOT)
+                for e_name, e_type in type_elements:
+                    if e_name == arg:
+                        t = e_type
+                        break
+                else:
+                    raise CompileError(EC.ELEMENT_NOT_DEFINED)
+            else:
+                assert False
+
+        self.type = t
+
+
+    def process_idx(self, prev_type, indices):
         # this function calculates the byte-offset indicated by the
-        # given indices into the array 'base'. we start from the last
-        # index, and work backwards. for the last, we just add the
-        # index value. for the one before that, we multiply the size
-        # of the last dimension by the value and then add it to what
-        # we had in the previous step. this will continue until the
-        # first index.
+        # given indices into the array the type of which is
+        # prev_type. we start from the last index, and work
+        # backwards. for the last, we just add the index value. for
+        # the one before that, we multiply the size of the last
+        # dimension by the value and then add it to what we had in the
+        # previous step. this will continue until the first index.
         #
         # for the array:
         #    arr(n1 TO m1, n2 TO m2, n3 TO m3)
@@ -406,21 +457,22 @@ class Lvalue:
         # given that the array has 100 cells, and (5, 5) is the last
         # 4-byte cell, the offset 96 calculated is indeed correct.
 
-        base_size = base.type.get_base_type().get_size()
+        base_type = self.compiler.get_type(prev_type.get_base_type_name())
+        base_size = base_type.get_size()
         instrs = []
 
         # push last offset first
         instrs += indices[-1].instrs
         t = indices[-1].type.typespec
         instrs += [Instr(f'conv{t}_ul')]
-        d_from, d_to = base.type.dimensions[-1]
+        d_from, d_to = prev_type.dimensions[-1]
         if d_from != 0:
             instrs += [Instr('pushi_ul', d_from),
                        Instr('sub_ul')]
 
         # now add the offsets for the higher dimensions
         dim_size = 1
-        for i, (d_from, d_to) in enumerate(base.type.dimensions[:-1]):
+        for i, (d_from, d_to) in enumerate(prev_type.dimensions[:-1]):
             dim_size *= (d_to - d_from + 1)
             instrs += [Instr('pushi_ul', dim_size)]
             instrs += indices[i].instrs
@@ -433,69 +485,95 @@ class Lvalue:
             instrs += [Instr('mul_ul'),
                        Instr('add_ul')]
 
-        instrs += [Instr('pushi_ul', base.type.get_base_type().get_size()),
+        instrs += [Instr('pushi_ul', base_type.get_size()),
                    Instr('mul_ul')]
+
+        return base_type, instrs
+
+
+    def process_dot(self, prev_type, element):
+        # returns instructions to add the offset for the given element
+        # to the address on the stack.
+
+        offset = 0
+        for e_name, e_type in prev_type.elements:
+            if e_name == element:
+                break
+            else:
+                offset += e_type.get_size()
+        else:
+            raise CompileError(EC.ELEMENT_NOT_DEFINED)
+
+        return e_type, [Instr('pushi_ul', offset)]
+
+
+    def gen_instructions(self, iname, *, ref=False):
+        # iname is either 'read' or 'write'.
+        #
+        # ref means whether only a reference is being calculated or
+        # the value itself.
+
+        assert iname == 'write' or not ref
+
+        size = self.type.get_size()
+        if self.ops == []:
+            if self.base.byref:
+                instrs = [Instr('readf4', self.base)]
+                if not ref:
+                    instrs += [Instr(f'{iname}i{size}')]
+            else:
+                if not ref:
+                    if size in [1, 2, 4, 8]:
+                        instrs = [Instr(f'{iname}f{size}', self.base)]
+                    else:
+                        instrs = [Instr(f'{iname}f_n', size, self.base)]
+                else:
+                    instrs = [Instr('pushfp', self.base)]
+        else:
+            # push base address on the stack
+            if self.base.byref:
+                instrs = [Instr('readf4', self.base)]
+            else:
+                instrs = [Instr('pushfp', self.base)]
+
+            # calculate offset on the stack
+            prev_type = self.base.type
+            for op, arg in self.ops:
+                if op == 'IDX':
+                    new_type, new_instrs = self.process_idx(prev_type, arg)
+                elif op == 'DOT':
+                    new_type, new_instrs = self.process_dot(prev_type, arg)
+                else:
+                    assert False
+
+                prev_type = new_type
+                instrs += new_instrs
+
+                # add base address and offset
+                instrs += [Instr('add_ul')]
+
+            # now do an indirect read/write (if asked for)
+            if not ref:
+                if size in [1, 2, 4, 8]:
+                    instrs += [Instr(f'{iname}i{size}')]
+                else:
+                    instrs += [Instr(f'{iname}i_n', size)]
 
         return instrs
 
 
     def gen_read_instructions(self):
-        base_size = self.base.type.get_base_type().get_size()
-        if self.ops == []:
-            if self.base.byref:
-                instrs = [Instr('readf4', self.base),
-                          Instr(f'readi{base_size}')]
-            else:
-                instrs = [Instr(f'readf{base_size}', self.base)]
-        else:
-            if self.base.byref:
-                instrs = [Instr('readf4', self.base)]
-            else:
-                instrs = [Instr('pushfp', self.base)]
-
-            indices = self.ops[0][1]
-            instrs += self.get_instrs_for_idx(self.base, indices)
-            instrs += [Instr('add_ul')]
-            instrs += [Instr(f'readi{base_size}')]
-
-        return instrs
+        return self.gen_instructions('read')
 
 
     def gen_write_instructions(self):
-        base_size = self.base.type.get_base_type().get_size()
-        if self.ops == []:
-            if self.base.byref:
-                instrs = [Instr('readf4', self.base),
-                          Instr(f'writei{base_size}')]
-            else:
-                instrs = [Instr(f'writef{base_size}', self.base)]
-        else:
-            if self.base.byref:
-                instrs = [Instr('readf4', self.base)]
-            else:
-                instrs = [Instr('pushfp', self.base)]
-
-            indices = self.ops[0][1]
-            instrs += self.get_instrs_for_idx(self.base, indices)
-            instrs += [Instr('add_ul')]
-            instrs += [Instr(f'writei{base_size}')]
-
-        return instrs
+        return self.gen_instructions('write')
 
 
     def gen_ref_instructions(self):
         # generate instructions that put the address of the lvalue on
         # the stack.
-        if self.base.byref:
-            instrs = [Instr('readf4', self.base)]
-        else:
-            instrs = [Instr('pushfp', self.base)]
-        if self.ops != []:
-            indices = self.ops[0][1]
-            instrs += self.get_instrs_for_idx(self.base, indices)
-            instrs += [Instr('add_ul')]
-
-        return instrs
+        return self.gen_instructions('write', ref=True)
 
 
 class Routine:
@@ -647,7 +725,7 @@ class Expr:
                 if isinstance(a, Tree) and \
                    a.data == 'value' and \
                    isinstance(a.children[0], Tree) and \
-                   a.children[0].data in ['var_or_no_arg_func', 'func_call_or_idx']:
+                   a.children[0].data in lvalue_aliases:
                     lv = self.parent.create_lvalue_if_possible(a.children[0])
 
                 if isinstance(lv, Lvalue):
@@ -713,8 +791,8 @@ class Expr:
             self.instrs += [Instr('syscall', '__concat')]
             self.typespec = '$'
             return
-        elif ltype == '$' or rtype == '$':
-            self.parent.error('Invalid operation.')
+        elif not left.type.is_numeric or not right.type.is_numeric:
+            raise CompileError(EC.INVALID_OPERATION)
 
         if ltype == rtype:
             t = ltype
@@ -729,10 +807,10 @@ class Expr:
             }[frozenset({ltype, rtype})]
 
         instrs = left.instrs
-        instrs += gen_conv_instrs(ltype, t)
+        instrs += gen_conv_instrs(left.type, Type(t))
 
         instrs += right.instrs
-        instrs += gen_conv_instrs(rtype, t)
+        instrs += gen_conv_instrs(right.type, Type(t))
 
         instrs += [Instr(op + t)]
 
@@ -742,7 +820,7 @@ class Expr:
 
     def compare_op(self, op, left, right):
         self.binary_op('sub', left, right)
-        self.instrs += gen_conv_instrs(self.type.typespec, '%')
+        self.instrs += gen_conv_instrs(self.type, Type('%'))
         self.instrs += [Instr(op)]
         self.typespec = '%'
 
@@ -828,6 +906,7 @@ class Compiler:
         self.string_literals = {}
         self.last_string_literal_idx = 0
         self.default_array_base = 1
+        self.user_defined_types = {}
 
         # map the names of declared subs/functions to a
         # DeclaredRoutine object which contains parameter types and
@@ -904,7 +983,7 @@ class Compiler:
             if isinstance(a, Tree) and \
                a.data == 'value' and \
                isinstance(a.children[0], Tree) and \
-               a.children[0].data in ['var_or_no_arg_func', 'func_call_or_idx']:
+               a.children[0].data in lvalue_aliases:
                 lv = self.create_lvalue_if_possible(a.children[0])
 
             if isinstance(lv, Lvalue):
@@ -993,7 +1072,8 @@ class Compiler:
             else:
                 dimensions = None
             typename = typename.children[0].value
-            self.dim_var(name, type=Type(typename, dimensions=dimensions),
+            self.dim_var(name,
+                         type=self.get_type(typename, dimensions=dimensions),
                          dimensions=dimensions)
 
 
@@ -1055,7 +1135,7 @@ class Compiler:
                         Instr(f'readf{var.size}', var),
                         Instr(f'readf{end_var.size}', end_var),
                         Instr(f'sub{var.type.typespec}')]
-        self.instrs += gen_conv_instrs(var.type.typespec, '%')
+        self.instrs += gen_conv_instrs(var.type, Type('%'))
         self.instrs += [Instr('gt'),
                         Instr('jmpt', end_label)]
         self.compile_ast(body)
@@ -1085,7 +1165,7 @@ class Compiler:
                 # form: var AS type
                 pname, _, ptype = p.children
                 pname = pname.value
-                ptype = Type(ptype.children[0].value)
+                ptype = self.get_type(ptype.children[0].value)
             else:
                 # form: var$
                 pname = p.children[0].value
@@ -1136,7 +1216,7 @@ class Compiler:
                 # form: var AS type
                 pname, _, ptype = p.children
                 pname = pname.value
-                ptype = Type(ptype.children[0].value)
+                ptype = self.get_type(ptype.children[0].value)
             else:
                 # form: var$
                 pname = p.children[0].value
@@ -1180,6 +1260,33 @@ class Compiler:
         self.instrs = saved_instrs
 
 
+    def process_type_block(self, ast):
+        _, type_name, *element_defs, _, _ = ast.children
+        if type_name[-1] in typespec_chars:
+            raise CompileError(EC.INVALID_TYPE_NAME)
+
+        if type_name in self.user_defined_types:
+            raise CompileError(EC.DUP_DEF)
+
+        type_name = type_name.value.upper()
+
+        if len(element_defs) == 0:
+            raise CompileError(EC.ELEMENT_NOT_DEFINED)
+
+        elements = []
+        for e in element_defs:
+            if len(e.children) == 1:
+                e_name, = e.children
+                e_type = get_default_type(e_name)
+            else:
+                e_name, _, e_type = e.children
+                e_type = self.get_type(e_type.children[0])
+
+            e_name = e_name.value
+            elements.append((e_name, e_type))
+
+        self.user_defined_types[type_name] = elements
+
 
     def process_next_stmt(self, ast):
         # NEXT statements with a matching FOR will be processed by the
@@ -1199,7 +1306,7 @@ class Compiler:
     def process_if_block(self, ast):
         _, cond, _, then_body, rest, _, _ = ast.children
         cond = Expr(cond, self)
-        self.instrs += cond.instrs + gen_conv_instrs(cond.typespec, '%')
+        self.instrs += cond.instrs + gen_conv_instrs(cond.type, Type('%'))
 
         self.endif_labels.append(self.gen_label('endif'))
 
@@ -1262,12 +1369,15 @@ class Compiler:
         expr = Expr(expr, self)
         self.instrs += expr.instrs
         if expr.type != lv.type:
-            self.instrs += gen_conv_instrs(expr.type.typespec, lv.type.typespec)
+            conv_instrs = gen_conv_instrs(expr.type, lv.type)
+            if conv_instrs == None:
+                raise CompileError(EC.TYPE_MISMATCH)
+            self.instrs += conv_instrs
         self.instrs += lv.gen_write_instructions()
 
 
     def gen_set_var_code(self, var, expr):
-        conv_instrs = gen_conv_instrs(expr.type.typespec, var.type.typespec)
+        conv_instrs = gen_conv_instrs(expr.type, var.type)
         if conv_instrs == None:
             raise CompileError(
                 EC.CANNOT_CONVERT_TYPE,
@@ -1283,18 +1393,41 @@ class Compiler:
         # this function receive a tree for the 'possibly_lvalue' rule,
         # and attempts to create an lvalue from it. if not possible,
         # None is returned.
-        name = ast.children[0].value
-        if self.is_function(name):
+
+        flattened = self.flatten_lvalue_tree(ast)
+        assert len(flattened) % 2 == 1
+
+        if len(flattened) == 1 and \
+           self.is_function(flattened[0]):
+            return None
+        elif len(flattened) == 3 and \
+             flattened[1] == 'IDX' and \
+             self.is_function(flattened[0]):
             return None
         else:
-            var = self.get_var(name)
-            if ast.data == 'var_or_no_arg_func':
-                lv = Lvalue([var])
-            else:
-                args = [Expr(i, self) for i in ast.children[1].children]
-                lv = Lvalue([var, 'IDX', args])
+            flattened[0] = self.get_var(flattened[0])
 
-            return lv
+            for i in range(1, len(flattened), 2):
+                op = flattened[i]
+                if op == 'IDX':
+                    indices = [Expr(i, self) for i in flattened[i + 1]]
+                    flattened[i + 1] = indices
+
+            return Lvalue(flattened, compiler=self)
+
+
+    def flatten_lvalue_tree(self, tree):
+        if tree.data == 'var_or_no_arg_func':
+            return [tree.children[0].value]
+        elif tree.data == 'func_call_or_idx':
+            return [tree.children[0].value, 'IDX', tree.children[1].children]
+        elif tree.data == 'dotted':
+            return \
+                self.flatten_lvalue_tree(tree.children[0]) + \
+                ["DOT"] + \
+                self.flatten_lvalue_tree(tree.children[1])
+        else:
+            assert False, 'This should not have happened.'
 
 
     def process_print_stmt(self, ast):
@@ -1441,6 +1574,18 @@ class Compiler:
             var.idx = -sum(v.size for v in var.container.local_vars[:lidx+1])
 
         return var
+
+
+    def get_type(self, name, *, dimensions=None):
+        name = name.upper()
+        if name in Type.basic_types:
+            return Type(name, dimensions=dimensions)
+
+        elements = self.user_defined_types.get(name, None)
+        if not elements:
+            raise CompileError(EC.UNDEFINED_TYPE)
+
+        return Type(name, elements=elements, dimensions=dimensions)
 
 
 class Assembler:

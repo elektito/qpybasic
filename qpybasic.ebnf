@@ -19,6 +19,7 @@ _nl: _NEWLINE _nl
 
 ?toplevel_block: sub_block
                | function_block
+               | type_block
 
 _line: [label | lineno] _stmt_group
 
@@ -64,6 +65,7 @@ typename: INTEGER_KW
         | SINGLE_KW
         | DOUBLE_KW
         | STRING_KW
+        | ID
 
 function_block: FUNCTION_KW ID parameter_list _NEWLINE block_body END_KW FUNCTION_KW
 
@@ -72,6 +74,8 @@ block_body: _block_body_item*
 _block_body_item: block _NEWLINE
                 | _line _NEWLINE
                 | _NEWLINE
+
+type_block: TYPE_KW ID _nl (parameter_definition _nl)* END_KW TYPE_KW
 
 call_stmt: possibly_lvalue argument_list
          | CALL_KW ID "(" argument_list ")"
@@ -127,8 +131,9 @@ value: NUMERIC_LITERAL
      | STRING_LITERAL
      | possibly_lvalue
 
-possibly_lvalue: ID                        -> var_or_no_arg_func
-               | ID "(" argument_list ")"  -> func_call_or_idx
+possibly_lvalue: ID                                   -> var_or_no_arg_func
+               | ID "(" argument_list ")"             -> func_call_or_idx
+               | possibly_lvalue "." possibly_lvalue  -> dotted
 
 _NEWLINE: "\n"
         | "\r\n"
@@ -165,6 +170,7 @@ STRING_KW: "string"i
 SUB_KW: "sub"i
 THEN_KW: "then"i
 TO_KW: "to"i
+TYPE_KW: "type"i
 
 COMMENT: /('|[rR][eE][mM][ \t\f]).*\n/
 %ignore COMMENT
