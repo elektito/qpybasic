@@ -75,12 +75,6 @@ def get_literal_type(literal):
                 raise CompileError(EC.INT_OUT_OF_RANGE)
 
 
-def get_default_type(var_name):
-    # For now, the default type for all variables is single. This can
-    # be changed when we implement DEFINT and friends.
-    return Type('SINGLE')
-
-
 def builtin_func_abs(parent, args):
     if len(args) != 1:
         raise CompileError(EC.INVALID_FUNC_NARGS)
@@ -137,6 +131,7 @@ class ErrorCodes(IntEnum):
     UNDEFINED_TYPE = 32
     INVALID_OPERATION = 33
     INVALID_USE_OF_DOT = 34
+    INVALID_DEFTYPE = 35
 
 
     def __str__(self):
@@ -236,6 +231,9 @@ class ErrorCodes(IntEnum):
 
             self.INVALID_USE_OF_DOT:
             'Invalid use of DOT',
+
+            self.INVALID_DEFTYPE:
+            'Invalid DEFtype statement',
         }.get(int(self), super().__str__())
 
 
@@ -356,14 +354,6 @@ class Type:
 
     def __hash__(self):
         return hash((self.name, self.is_array))
-
-
-    @staticmethod
-    def from_var_name(var_name):
-        if var_name[-1] in typespec_chars:
-            return Type(var_name[-1])
-        else:
-            return get_default_type(var_name)
 
 
 class Var:
@@ -695,7 +685,7 @@ class Expr:
             args = []
         fname = fname.lower()
         if fname[-1] in typespec_chars:
-            called_type = Type.from_var_name(fname)
+            called_type = self.parent.get_type_from_var_name(fname)
             fname = fname[:-1]
         else:
             called_type = None
@@ -907,6 +897,7 @@ class Compiler:
         self.last_string_literal_idx = 0
         self.default_array_base = 1
         self.user_defined_types = {}
+        self.default_types = {}
 
         # map the names of declared subs/functions to a
         # DeclaredRoutine object which contains parameter types and
@@ -1024,13 +1015,13 @@ class Compiler:
             if routine_type == 'sub':
                 raise CompileError(EC.INVALID_SUB_NAME)
             else:
-                ret_type = Type.from_var_name(name)
+                ret_type = self.get_type_from_var_name(name)
                 name = name[:-1]
         else:
             if routine_type == 'sub':
                 ret_type = None
             else:
-                ret_type = Type.from_var_name(name)
+                ret_type = self.get_type_from_var_name(name)
 
         param_types = []
         for p in params.children:
@@ -1042,7 +1033,7 @@ class Compiler:
             else:
                 # form: var$
                 pname = p.children[0].value
-                ptype = Type.from_var_name(pname)
+                ptype = self.get_type_from_var_name(pname)
 
             param_types.append(ptype)
 
@@ -1059,6 +1050,31 @@ class Compiler:
         else:
             dr = DeclaredRoutine(routine_type, name, param_types, ret_type)
             self.declared_routines[name] = dr
+
+
+    def process_deftype_stmt(self, ast):
+        keyword, *ranges = ast.children
+        keyword = keyword.upper()
+        t = {
+            'DEFINT': Type('%'),
+            'DEFLNG': Type('&'),
+            'DEFSNG': Type('!'),
+            'DEFDBL': Type('#'),
+            'DEFSTR': Type('$'),
+        }[keyword]
+
+        for r in ranges:
+            if len(r.children) == 2:
+                r_from, r_to = r.children
+            else:
+                r_from, = r.children
+                r_to = r_from
+
+            if len(r_from) != 1 or len(r_to) != 1:
+                raise CompileError(EC.INVALID_DEFTYPE)
+
+            for i in range(ord(r_from), ord(r_to) + 1):
+                self.default_types[chr(i)] = t
 
 
     def process_dim_stmt(self, ast):
@@ -1198,7 +1214,7 @@ class Compiler:
     def process_function_block(self, ast):
         _, name, params, body, _, _ = ast.children
 
-        ftype = Type.from_var_name(name.value)
+        ftype = self.get_type_from_var_name(name.value)
         name = name.value
         if name[-1] in typespec_chars:
             name = name[:-1]
@@ -1277,7 +1293,7 @@ class Compiler:
         for e in element_defs:
             if len(e.children) == 1:
                 e_name, = e.children
-                e_type = get_default_type(e_name)
+                e_type = self.get_default_type(e_name)
             else:
                 e_name, _, e_type = e.children
                 e_type = self.get_type(e_type.children[0])
@@ -1493,7 +1509,7 @@ class Compiler:
 
 
     def is_function(self, name):
-        ftype = Type.from_var_name(name)
+        ftype = self.get_type_from_var_name(name)
         if name[-1] in typespec_chars:
             name = name[:-1]
         return \
@@ -1521,7 +1537,7 @@ class Compiler:
             name = used_name
             typespec = None
             if not type:
-                type = get_default_type(used_name)
+                type = self.get_default_type(used_name)
 
         containers = [self.cur_routine]
         for c in containers:
@@ -1586,6 +1602,18 @@ class Compiler:
             raise CompileError(EC.UNDEFINED_TYPE)
 
         return Type(name, elements=elements, dimensions=dimensions)
+
+
+    def get_type_from_var_name(self, var_name):
+        if var_name[-1] in typespec_chars:
+            return Type(var_name[-1])
+        else:
+            return self.get_default_type(var_name)
+
+
+    def get_default_type(self, var_name):
+        t = self.default_types.get(var_name[0], None)
+        return t if t else Type('SINGLE')
 
 
 class Assembler:

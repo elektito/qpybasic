@@ -33,6 +33,7 @@ lineno: NUMERIC_LITERAL
 ?stmt: call_stmt
      | cls_stmt
      | declare_stmt
+     | deftype_stmt
      | dim_stmt
      | end_stmt
      | goto_stmt
@@ -86,6 +87,13 @@ argument_list: expr ("," expr)*
 cls_stmt: CLS_KW
 
 declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) ID parameter_list
+
+deftype_stmt: (DEFINT_KW | DEFLNG_KW | DEFSNG_KW | DEFDBL_KW | DEFSTR_KW) letter_range ("," letter_range)*
+
+// we're using ID here instead of single letters because it was
+// conflicting with ID. so we'll check for single letters in the
+// compiler.
+letter_range: ID ["-" ID]
 
 dim_stmt: DIM_KW ID dimensions [AS_KW typename]
 
@@ -150,6 +158,11 @@ AS_KW: "as"i
 CALL_KW: "call"i
 CLS_KW: "cls"i
 DECLARE_KW: "declare"i
+DEFDBL_KW: "defdbl"i
+DEFINT_KW: "defint"i
+DEFLNG_KW: "deflng"i
+DEFSNG_KW: "defsng"i
+DEFSTR_KW: "defstr"i
 DIM_KW: "dim"i
 DOUBLE_KW: "double"i
 ELSE_KW: "else"i
