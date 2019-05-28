@@ -1177,20 +1177,7 @@ class Compiler:
                         Instr('frame', self.cur_routine)]
 
         for p in params.children:
-            if len(p.children) == 3:
-                # form: var AS type
-                pname, _, ptype = p.children
-                pname = pname.value
-                ptype = self.get_type(ptype.children[0].value)
-            else:
-                # form: var$
-                pname = p.children[0].value
-                ptype = None
-
-            if any(pname == i.name for i in self.cur_routine.params):
-                raise CompileError(EC.DUP_PARAM)
-
-            self.dim_var(pname, type=ptype, klass='param', byref=True)
+            self.parse_param_def(p)
 
         if name in self.declared_routines:
             defined_param_types = [v.type for v in self.cur_routine.params]
@@ -1211,6 +1198,23 @@ class Compiler:
         self.instrs = saved_instrs
 
 
+    def parse_param_def(self, p):
+        if len(p.children) == 3:
+            # form: var AS type
+            pname, _, ptype = p.children
+            pname = pname.value
+            ptype = self.get_type(ptype.children[0].value)
+        else:
+            # form: var$
+            pname = p.children[0].value
+            ptype = None
+
+        if any(pname == i.name for i in self.cur_routine.params):
+            raise CompileError(EC.DUP_PARAM)
+
+        self.dim_var(pname, type=ptype, klass='param', byref=True)
+
+
     def process_function_block(self, ast):
         _, name, params, body, _, _ = ast.children
 
@@ -1228,20 +1232,7 @@ class Compiler:
                         Instr('frame', self.cur_routine)]
 
         for p in params.children:
-            if len(p.children) == 3:
-                # form: var AS type
-                pname, _, ptype = p.children
-                pname = pname.value
-                ptype = self.get_type(ptype.children[0].value)
-            else:
-                # form: var$
-                pname = p.children[0].value
-                ptype = None
-
-            if any(pname == i.name for i in self.cur_routine.params):
-                raise CompileError(EC.DUP_PARAM)
-
-            self.dim_var(pname, type=ptype, klass='param', byref=True)
+            self.parse_param_def(p)
 
         # create a variable with the same name as the function. this
         # will be used for returning values.
