@@ -86,7 +86,7 @@ argument_list: expr ("," expr)*
 
 cls_stmt: CLS_KW
 
-declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) ID parameter_list
+declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) ID (parameter_list | "(" ")" )
 
 deftype_stmt: (DEFINT_KW | DEFLNG_KW | DEFSNG_KW | DEFDBL_KW | DEFSTR_KW) letter_range ("," letter_range)*
 
