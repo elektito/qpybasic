@@ -36,13 +36,91 @@ print 10
 class TestCallSub1:
     code = """
 sub foo
+   print "foo"
 end sub
 
 call foo
     """
 
     cevents = []
-    vevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
+class TestCallSub2:
+    code = """
+sub foo
+    print "foo"
+end sub
+
+foo
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
+class TestCallSub3:
+    code = """
+sub foo(msg as string)
+   print msg
+end sub
+
+call foo("foo")
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
+class TestCallSub4:
+    code = """
+sub foo(msg as string)
+    print msg
+end sub
+
+foo "foo"
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
+class TestCallSub5:
+    code = """
+sub foo(msg as string, n&)
+   print msg; n&
+end sub
+
+call foo("foo", 100)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo 100 \n'),
+    ]
+
+
+class TestCallSub6:
+    code = """
+sub foo(msg as string, n&)
+    print msg; n&
+end sub
+
+foo "foo", 100
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo 100 \n'),
+    ]
 
 
 class TestFunctionRecursion1:
