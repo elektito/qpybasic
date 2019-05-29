@@ -961,12 +961,16 @@ class Compiler:
         # 'possibly_lvalue' as the sub name (instead of the more
         # sensible ID). so here, we check whether it is in fact
         # actually an ID.
-        if len(sub_name.children) != 1 or sub_name.children[0].type != 'ID':
-            raise CompileError(EC.NO_SUCH_SUB)
-        else:
+        if isinstance(sub_name, Tree):
             sub_name = sub_name.children[0].value
+        else:
+            sub_name = sub_name.value
 
-        if sub_name not in self.routines:
+        defined = self.routines.get(sub_name, None)
+        declared = self.declared_routines.get(sub_name, None)
+        if declared and declared.type != 'sub':
+            declared = None
+        if not defined and not declared:
             raise CompileError(EC.NO_SUCH_SUB,
                                f'No such sub-routine: {sub_name}')
 
