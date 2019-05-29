@@ -248,6 +248,8 @@ class CompileError(Exception):
         if not msg:
             msg = str(code)
 
+        self.code = code
+
         super().__init__(msg)
 
 
