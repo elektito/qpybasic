@@ -33,6 +33,77 @@ print 10
     ]
 
 
+class TestFunctionRecursion1:
+    code = """
+declare function fib%(n%)
+
+dim i as integer
+
+for i = 1 to 10
+   print "fib"; i; fib%(i)
+next
+
+function fib%(n%)
+   if n% < 3 then
+      fib% = 1
+   else
+      fib% = fib%(n%-2) + fib%(n%-1)
+   end if
+end function
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'fib 1  1 \n'),
+        ('print', 'fib 2  1 \n'),
+        ('print', 'fib 3  2 \n'),
+        ('print', 'fib 4  3 \n'),
+        ('print', 'fib 5  5 \n'),
+        ('print', 'fib 6  8 \n'),
+        ('print', 'fib 7  13 \n'),
+        ('print', 'fib 8  21 \n'),
+        ('print', 'fib 9  34 \n'),
+        ('print', 'fib 10  55 \n'),
+    ]
+
+
+class TestSubRecursion1:
+    code = """
+declare sub fib(n%, r%)
+
+dim i as integer
+
+for i = 1 to 10
+   call fib(i, r%)
+   print "fib"; i; r
+next
+
+sub fib(n%, r%)
+   if n% < 3 then
+      r% = 1
+   else
+      fib n% - 1, r1%
+      fib n% - 2, r2%
+      r% = r1% + r2%
+   end if
+end sub
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'fib 1  1 \n'),
+        ('print', 'fib 2  1 \n'),
+        ('print', 'fib 3  2 \n'),
+        ('print', 'fib 4  3 \n'),
+        ('print', 'fib 5  5 \n'),
+        ('print', 'fib 6  8 \n'),
+        ('print', 'fib 7  13 \n'),
+        ('print', 'fib 8  21 \n'),
+        ('print', 'fib 9  34 \n'),
+        ('print', 'fib 10  55 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
