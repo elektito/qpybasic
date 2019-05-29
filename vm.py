@@ -29,6 +29,20 @@ class Machine:
         self.stopped = False
 
         self.check_stack_changes = True
+        self.event_handler = self.event_handler_routine
+
+
+    def event_handler_routine(self, event):
+        event_name, *args = event
+        if event_name == 'cls':
+            seq =  '\033[2J'    # clear screen
+            seq += '\033[1;1H'  # move cursor to screen top-left
+            print(seq)
+        elif event_name == 'print':
+            buf, = args
+            print(buf, end='')
+        else:
+            logger.error(f'Unknown machine event: {event_name}')
 
 
     def launch(self):
@@ -732,9 +746,7 @@ class Machine:
 
     def syscall_cls(self):
         logger.debug('SYSCALL: cls')
-        seq =  '\033[2J'    # clear screen
-        seq += '\033[1;1H'  # move cursor to screen top-left
-        print(seq)
+        self.event_handler(('cls',))
 
 
     def syscall_print(self):
@@ -787,7 +799,7 @@ class Machine:
         if nargs == 0 or typeid not in (6, 7):
             buf += '\n'
 
-        print(buf, end='')
+        self.event_handler(('print', buf))
 
 
     def error(self, msg):
