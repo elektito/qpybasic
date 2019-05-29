@@ -323,6 +323,110 @@ end sub
     ]
 
 
+class TestDeclareDefMismatch1:
+    code = """
+declare sub foo(n, m)
+
+sub foo(n)
+end sub
+    """
+
+    cevents = [
+        ('error', EC.SUB_DEF_NOT_MATCH_DECL),
+    ]
+    vevents = []
+
+
+class TestDeclareDefMismatch2:
+    code = """
+sub foo(n)
+end sub
+
+declare sub foo(n, m)
+    """
+
+    cevents = [
+        ('error', EC.DECL_NOT_MATCH_DEF),
+    ]
+    vevents = []
+
+
+class TestDeclareDefMismatch3:
+    code = """
+function foo(n)
+end function
+
+declare function foo(n, m)
+    """
+
+    cevents = [
+        ('error', EC.DECL_NOT_MATCH_DEF),
+    ]
+    vevents = []
+
+
+class TestDeclareDefMismatch4:
+    code = """
+declare function foo(n, m)
+
+function foo(n)
+end function
+    """
+
+    cevents = [
+        ('error', EC.FUNC_DEF_NOT_MATCH_DECL),
+    ]
+    vevents = []
+
+
+class TestConflictingDecl1:
+    code = """
+declare function foo(n, m)
+declare function foo(n)
+    """
+
+    cevents = [
+        ('error', EC.CONFLICTING_DECL),
+    ]
+    vevents = []
+
+
+class TestConflictingDecl2:
+    code = """
+declare function foo(n)
+declare function foo&(n)
+    """
+
+    cevents = [
+        ('error', EC.CONFLICTING_DECL),
+    ]
+    vevents = []
+
+
+class TestConflictingDecl3:
+    code = """
+declare sub foo(n, m)
+declare sub foo(n)
+    """
+
+    cevents = [
+        ('error', EC.CONFLICTING_DECL),
+    ]
+    vevents = []
+
+
+class TestConflictingDecl4:
+    code = """
+declare sub foo(n)
+declare function foo(n)
+    """
+
+    cevents = [
+        ('error', EC.CONFLICTING_DECL),
+    ]
+    vevents = []
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
