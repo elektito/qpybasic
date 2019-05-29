@@ -40,20 +40,16 @@ class Module:
 
         # const section header: type, len, load_addr
         str_section = self.sections[Sections.STRINGS]
-        total_len = sum(len(i) + 2 for i in str_section['data'])
         str_section_hdr = struct.pack('>BII',
                                       int(Sections.STRINGS),
-                                      total_len,
+                                      len(str_section['data']),
                                       str_section['addr'])
-
-        str_section_data = b''.join(struct.pack('>h', len(i)) + i.encode('ascii')
-                                    for i in str_section['data'])
 
         return file_hdr + \
             code_section_hdr + \
             code_section['data'] + \
             str_section_hdr + \
-            str_section_data
+            str_section['data']
 
 
     @staticmethod
@@ -88,11 +84,11 @@ class Module:
     def create(bytecode, string_literals):
         # the string_literals passed to this function is a dictionary
         # which maps each string to its index in the string
-        # section. we just convert it to a list of strings sorted by
-        # that index here. the strings will be placed in the proper
-        # location later as long as this list is sorted correctly.
+        # section.
         string_literals = list(sorted(string_literals.items(), key=lambda r: r[1]))
         string_literals = [value for value, index in string_literals]
+        string_literals = b''.join(struct.pack('>h', len(i)) + i.encode('ascii')
+                                   for i in string_literals)
 
         return Module({
             Sections.CODE: {
