@@ -953,7 +953,12 @@ class Compiler:
 
     def process_call_stmt(self, ast):
         if len(ast.children) == 2:
-            sub_name, args = ast.children
+            if isinstance(ast.children[0], Token) and \
+               ast.children[0].type == 'CALL_KW':
+                _, sub_name = ast.children
+                args = Tree('argument_list', [])
+            else:
+                sub_name, args = ast.children
         else:
             _, sub_name, args = ast.children
 

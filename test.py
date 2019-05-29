@@ -33,6 +33,18 @@ print 10
     ]
 
 
+class TestCallSub1:
+    code = """
+sub foo
+end sub
+
+call foo
+    """
+
+    cevents = []
+    vevents = []
+
+
 class TestFunctionRecursion1:
     code = """
 declare function fib%(n%)
