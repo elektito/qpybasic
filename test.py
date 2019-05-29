@@ -1,6 +1,7 @@
 import logging
 import traceback
 import unittest
+import sys
 from compiler import Compiler, CompileError, EC
 from vm import Machine
 
@@ -364,6 +365,7 @@ def main():
             else:
                 success.append(name)
                 print('.', end='')
+            sys.stdout.flush()
 
     print()
     if len(failed) == 0:
