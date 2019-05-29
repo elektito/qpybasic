@@ -427,6 +427,25 @@ declare function foo(n)
     vevents = []
 
 
+class TestArray1:
+    code = """
+dim x(20) as long
+
+for i% = 1 to 20
+    x(i%) = i% * 10 + 1
+next
+
+for i% = 1 to 20
+    print x(i%)
+next
+    """
+
+    cevents = []
+    vevents = [
+        ('print', f' {i * 10 + 1} \n') for i in range(1, 21)
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
