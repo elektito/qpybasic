@@ -1,7 +1,7 @@
 import logging
 import traceback
 import unittest
-from compiler import Compiler, CompileError
+from compiler import Compiler, CompileError, EC
 from vm import Machine
 
 logger = logging.getLogger(__name__)
@@ -123,6 +123,134 @@ foo "foo", 100
     ]
 
 
+class TestSubCallMismatch1:
+    code = """
+sub foo(msg as string, n&)
+    print msg; n&
+end sub
+
+foo "foo"
+    """
+
+    cevents = [
+        ('error', EC.ARGUMENT_COUNT_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestSubCallMismatch2:
+    code = """
+sub foo(msg as string, n&)
+    print msg; n&
+end sub
+
+foo "foo", 1, 2
+    """
+
+    cevents = [
+        ('error', EC.ARGUMENT_COUNT_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestSubCallMismatch3:
+    code = """
+declare sub foo(msg$, n&)
+
+foo "foo"
+
+sub foo(msg as string, n&)
+    print msg; n&
+end sub
+    """
+
+    cevents = [
+        ('error', EC.ARGUMENT_COUNT_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestSubCallMismatch4:
+    code = """
+declare sub foo(msg$, n&)
+
+foo "foo", 1, 2
+
+sub foo(msg as string, n&)
+    print msg; n&
+end sub
+    """
+
+    cevents = [
+        ('error', EC.ARGUMENT_COUNT_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestFunctionCallMismatch1:
+    code = """
+function foo(msg as string, n&)
+    foo = n& + 100
+end function
+
+ret = foo("foo")
+    """
+
+    cevents = [
+        ('error', EC.ARGUMENT_COUNT_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestFunctionCallMismatch2:
+    code = """
+function foo(msg as string, n&)
+    foo = n& + 100
+end function
+
+ret = foo("foo", 1, 2)
+    """
+
+    cevents = [
+        ('error', EC.ARGUMENT_COUNT_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestFunctionCallMismatch3:
+    code = """
+declare function foo(msg as string, n as long)
+
+ret = foo("foo")
+
+function foo(msg as string, n&)
+    foo = n& + 100
+end function
+    """
+
+    cevents = [
+        ('error', EC.ARGUMENT_COUNT_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestFunctionCallMismatch4:
+    code = """
+declare function foo(msg as string, n as long)
+
+ret = foo("foo", 1, 2)
+
+function foo(msg as string, n&)
+    foo = n& + 100
+end function
+    """
+
+    cevents = [
+        ('error', EC.ARGUMENT_COUNT_MISMATCH)
+    ]
+    vevents = []
+
+
 class TestFunctionRecursion1:
     code = """
 declare function fib%(n%)
@@ -206,15 +334,17 @@ def run_test_case(name, case):
         module = c.compile(case.code)
     except CompileError as e:
         event_handler(('error', e.code))
+        module = None
     tc.assertEqual(events, case.cevents)
 
-    events = []
-    machine = Machine.load(module)
-    machine.event_handler = event_handler
-    machine.launch()
-    machine.shutdown()
+    if module:
+        events = []
+        machine = Machine.load(module)
+        machine.event_handler = event_handler
+        machine.launch()
+        machine.shutdown()
 
-    tc.assertEqual(events, case.vevents)
+        tc.assertEqual(events, case.vevents)
 
 
 def main():

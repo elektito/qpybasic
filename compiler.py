@@ -132,6 +132,7 @@ class ErrorCodes(IntEnum):
     INVALID_OPERATION = 33
     INVALID_USE_OF_DOT = 34
     INVALID_DEFTYPE = 35
+    ARGUMENT_COUNT_MISMATCH = 36
 
 
     def __str__(self):
@@ -234,6 +235,9 @@ class ErrorCodes(IntEnum):
 
             self.INVALID_DEFTYPE:
             'Invalid DEFtype statement',
+
+            self.ARGUMENT_COUNT_MISMATCH:
+            'Argument-count mismatch'
         }.get(int(self), super().__str__())
 
 
@@ -698,13 +702,18 @@ class Expr:
             if called_type and self.type != called_type:
                 raise CompileError(EC.FUNC_RET_TYPE_MISMATCH)
         else:
-            if fname in self.parent.routines:
-                self.type = self.parent.routines[fname].ret_type
-            elif fname in self.parent.declared_routines:
-                r = self.parent.declared_routines[fname]
-                if r.type == 'sub':
+            defined = self.parent.routines.get(fname, None)
+            declared = self.parent.declared_routines.get(fname, None)
+            if defined:
+                if len(args) != len(defined.params):
+                    raise CompileError(EC.ARGUMENT_COUNT_MISMATCH)
+                self.type = defined.ret_type
+            elif declared:
+                if declared.type == 'sub':
                     raise CompileError(EC.SUB_CALLED_AS_FUNC)
-                self.type = r.ret_type
+                if len(args) != len(declared.param_types):
+                    raise CompileError(EC.ARGUMENT_COUNT_MISMATCH)
+                self.type = declared.ret_type
             else:
                 raise CompileError(EC.NO_SUCH_FUNC, f'No such function: {fname}')
 
@@ -975,7 +984,14 @@ class Compiler:
         declared = self.declared_routines.get(sub_name, None)
         if declared and declared.type != 'sub':
             declared = None
-        if not defined and not declared:
+
+        if defined:
+            if len(args.children) != len(defined.params):
+                raise CompileError(EC.ARGUMENT_COUNT_MISMATCH)
+        elif declared:
+            if len(args.children) != len(declared.param_types):
+                raise CompileError(EC.ARGUMENT_COUNT_MISMATCH)
+        elif not defined and not declared:
             raise CompileError(EC.NO_SUCH_SUB,
                                f'No such sub-routine: {sub_name}')
 
