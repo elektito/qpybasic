@@ -57,8 +57,7 @@ class Module:
         file_hdr = module[:5]
         magic = file_hdr[:2]
         if magic != Module.file_magic:
-            logger.error('Invalid magic. Module is not valid.')
-            exit(1)
+            raise RuntimeError('Invalid magic. Module is not valid.')
         version, nsections = struct.unpack('>BH', file_hdr[2:])
         if version != Module.version:
             raise RuntimeError('Unsupported module version.')
