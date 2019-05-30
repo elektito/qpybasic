@@ -790,7 +790,7 @@ class Expr:
 
         if ltype == rtype == '$' and op == 'add':
             self.instrs += [Instr('syscall', '__concat')]
-            self.typespec = '$'
+            self.type = Type('$')
             return
         elif not left.type.is_numeric or not right.type.is_numeric:
             raise CompileError(EC.INVALID_OPERATION)
@@ -823,7 +823,7 @@ class Expr:
         self.binary_op('sub', left, right)
         self.instrs += gen_conv_instrs(self.type, Type('%'))
         self.instrs += [Instr(op)]
-        self.typespec = '%'
+        self.type = Type('%')
 
 
 class Label:
