@@ -245,6 +245,19 @@ class Machine:
         return 0
 
 
+    def exec_div_long(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>i', y)
+        x, = struct.unpack('>i', x)
+        result = x // y
+        result = struct.pack('>i', result)
+        self.push(result)
+        logger.debug('EXEC: div&')
+        return 0
+
+
+
     def exec_dup2(self):
         value = self.pop(2)
         self.push(value)
