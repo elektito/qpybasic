@@ -613,6 +613,13 @@ def main():
             if name in args.test_case
         }
 
+        if len(test_cases) != len(args.test_case):
+            not_found = set(args.test_case) - set(get_all_tests())
+            print('The following test case(s) not found:')
+            for i in not_found:
+                print(f'    {i}')
+            exit(1)
+
     failed = []
     success = []
 
