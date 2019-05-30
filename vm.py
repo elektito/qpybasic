@@ -207,6 +207,18 @@ class Machine:
         return 0
 
 
+    def exec_conv_long_integer(self):
+        value = self.pop(4)
+        value, = struct.unpack('>i', value)
+        value = int(value)
+        if value > 32767 or value < -32768:
+            value = -32768
+        value = struct.pack('>h', value)
+        self.push(value)
+        logger.debug('EXEC: conv&%')
+        return 0
+
+
     def exec_conv_single_integer(self):
         value = self.pop(4)
         value, = struct.unpack('>f', value)
@@ -231,6 +243,16 @@ class Machine:
         return 0
 
 
+    def exec_conv_single_double(self):
+        value = self.pop(4)
+        value, = struct.unpack('>f', value)
+        value = int(value)
+        value = struct.pack('>d', value)
+        self.push(value)
+        logger.debug('EXEC: conv!#')
+        return 0
+
+
     def exec_conv_single_ul(self):
         value = self.pop(4)
         value, = struct.unpack('>f', value)
@@ -242,6 +264,18 @@ class Machine:
         value = struct.pack('>I', value)
         self.push(value)
         logger.debug('EXEC: conv!_ul')
+        return 0
+
+
+    def exec_conv_double_integer(self):
+        value = self.pop(8)
+        value, = struct.unpack('>d', value)
+        value = int(value)
+        if value > 32767 or value < -32768:
+            value = -32768
+        value = struct.pack('>h', value)
+        self.push(value)
+        logger.debug('EXEC: conv#%')
         return 0
 
 
@@ -269,6 +303,17 @@ class Machine:
     def exec_end(self):
         self.stopped = True
         logger.debug('EXEC: end')
+        return 0
+
+
+    def exec_eq(self):
+        value = self.pop(2)
+        value, = struct.unpack('>h', value)
+        if value == 0:
+            self.push(TRUE)
+        else:
+            self.push(FALSE)
+        logger.debug('EXEC: eq')
         return 0
 
 
@@ -467,6 +512,13 @@ class Machine:
         return 4
 
 
+    def exec_pushi_double(self):
+        value = self.mem.read(8)
+        self.push(value)
+        logger.debug('EXEC: pushi#')
+        return 8
+
+
     def exec_pushi_pointer(self):
         value = self.mem.read(4)
         self.push(value)
@@ -619,6 +671,18 @@ class Machine:
         result = struct.pack('>f', result)
         self.push(result)
         logger.debug('EXEC: sub!')
+        return 0
+
+
+    def exec_sub_double(self):
+        y = self.pop(8)
+        x = self.pop(8)
+        y, = struct.unpack('>d', y)
+        x, = struct.unpack('>d', x)
+        result = x - y
+        result = struct.pack('>d', result)
+        self.push(result)
+        logger.debug('EXEC: sub#')
         return 0
 
 
