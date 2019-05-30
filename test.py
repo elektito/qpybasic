@@ -515,6 +515,51 @@ next
     ]
 
 
+class TestArray2:
+    code = """
+dim x(1 TO 3, 3 TO 5) as long
+
+x(1, 3) = 100
+x(3, 3) = 200
+x(3, 5) = 300
+
+print x(1, 3); x(3, 3); x(3, 5)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100  200  300 \n'),
+    ]
+
+
+class TestArray3:
+    code = """
+sub alter(x as long)
+    x = x * 2
+end sub
+
+dim x(5) as long
+
+for i = 1 to 5
+    x(i) = i
+next
+
+for i = 1 to 5
+    alter x(i)
+    print x(i)
+next
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 2 \n'),
+        ('print', ' 4 \n'),
+        ('print', ' 6 \n'),
+        ('print', ' 8 \n'),
+        ('print', ' 10 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
