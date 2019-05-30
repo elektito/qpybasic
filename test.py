@@ -12,6 +12,31 @@ logger = logging.getLogger(__name__)
 # statement.
 tc = unittest.TestCase()
 
+class TestArith1:
+    code = """
+x& = 100
+let y& = 200
+
+print x& * (y& + 1) / 10
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 2010 \n')
+    ]
+
+
+class TestArith2:
+    code = """
+print 2 + 3 * 4
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 14 \n')
+    ]
+
+
 class TestCls:
     code = """
 cls
@@ -31,6 +56,50 @@ print 10
     cevents = []
     vevents = [
         ('print', ' 10 \n'),
+    ]
+
+
+class TestPrint2:
+    code = """
+print -10
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '-10 \n'),
+    ]
+
+
+class TestPrint3:
+    code = """
+print 0
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+    ]
+
+
+class TestPrint4:
+    code = """
+print "foo"
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
+class TestPrint5:
+    code = """
+print 1, 2
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 1             2 \n'),
     ]
 
 
