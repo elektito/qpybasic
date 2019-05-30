@@ -2,6 +2,7 @@ import logging
 import traceback
 import unittest
 import sys
+import argparse
 from compiler import Compiler, CompileError, EC
 from vm import Machine
 
@@ -585,24 +586,50 @@ def run_test_case(name, case):
         tc.assertEqual(events, case.vevents)
 
 
+def get_all_tests():
+    return {
+        name: value
+        for name, value in globals().items()
+        if name.startswith('Test') and isinstance(value, type)
+    }
+
+
 def main():
+    parser = argparse.ArgumentParser(
+        description='Run qpybasic tests.')
+
+    parser.add_argument(
+        'test_case', nargs='*',
+        help='The test case(s) to run. Any number of test cases can be '
+        'passed. Defaults to running all tests.')
+
+    args = parser.parse_args()
+
+    test_cases = get_all_tests()
+    if args.test_case != []:
+        test_cases = {
+            name: value
+            for name, value in test_cases.items()
+            if name in args.test_case
+        }
+
     failed = []
     success = []
 
-    for name, value in globals().items():
-        if name.startswith('Test') and isinstance(value, type):
-            try:
-                run_test_case(name, value)
-            except Exception as e:
-                failed.append((name, e))
-                if isinstance(e, AssertionError):
-                    print('F', end='')
-                else:
-                    print('E', end='')
+    print(f'Running {len(test_cases)} test case(s).')
+    for name, value in test_cases.items():
+        try:
+            run_test_case(name, value)
+        except Exception as e:
+            failed.append((name, e))
+            if isinstance(e, AssertionError):
+                print('F', end='')
             else:
-                success.append(name)
-                print('.', end='')
-            sys.stdout.flush()
+                print('E', end='')
+        else:
+            success.append(name)
+            print('.', end='')
+        sys.stdout.flush()
 
     print()
     if len(failed) == 0:
