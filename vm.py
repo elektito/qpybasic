@@ -692,7 +692,7 @@ class Machine:
         if value == 0x02: #cls
             self.syscall_cls()
         elif value == 0x03: #concat
-            pass
+            logger.error('CONCAT not implemented yet. corruption might occur.')
         elif value == 0x04: #print
             self.syscall_print()
         logger.debug('EXEC: syscall')
