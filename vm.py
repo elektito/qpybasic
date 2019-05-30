@@ -546,6 +546,16 @@ class Machine:
         return 2
 
 
+    def exec_readf8(self):
+        idx = self.mem.read(2)
+        idx, = struct.unpack('>h', idx)
+        self.mem.seek(self.fp + idx)
+        value = self.mem.read(8)
+        self.push(value)
+        logger.debug('EXEC: readf8')
+        return 2
+
+
     def exec_readf_n(self):
         size = self.mem.read(2)
         size, = struct.unpack('>H', size)
