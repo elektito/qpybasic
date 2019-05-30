@@ -561,6 +561,188 @@ next
     ]
 
 
+class TestType1:
+    code = """
+type foo
+    x as integer
+    y as long
+    z
+end type
+
+dim a as foo
+
+a.x = 100
+a.y = 200
+a.z = 300
+
+print a.x=100; a.y=200; a.z=300
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '-1 -1 -1 \n'),
+    ]
+
+
+class TestType2:
+    code = """
+type foo
+    x as integer
+    y as long
+    z as integer
+end type
+
+type bar
+    f as foo
+    g as long
+end type
+
+dim a as foo
+dim b as bar
+
+a.x = 100
+a.y = 200
+a.z = 300
+b.f = a
+
+print b.f.x; b.f.y; b.f.z
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100  200  300 \n'),
+    ]
+
+class TestType3:
+    code = """
+type foo
+    x as integer
+    y as long
+    z as integer
+end type
+
+type bar
+    f as foo
+    g as long
+end type
+
+type spam
+    eggs as bar
+    something as double
+end type
+
+dim a as spam
+a.eggs.f.y = 100
+
+print a.eggs.f.y
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n'),
+    ]
+
+
+class TestType4:
+    code = """
+type foo
+    x as integer
+    y as long
+    z as integer
+end type
+
+type bar
+    f as foo
+    g as long
+end type
+
+sub alter(x as foo, y as long)
+    x.y = y
+end sub
+
+dim a as foo
+dim b as bar
+
+alter a, 100
+alter b.f, 200
+
+print a.y; b.f.y
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100  200 \n'),
+    ]
+
+
+class TestType5:
+    code = """
+type foo
+    x as integer
+    y as long
+    z as integer
+end type
+
+type bar
+    f as foo
+    g as long
+end type
+
+sub alter(x as foo, y as long)
+    dim a as foo
+    a.y = y
+    x = a
+end sub
+
+dim a as foo
+dim b as bar
+
+alter a, 100
+alter b.f, 200
+
+print a.y; b.f.y
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100  200 \n'),
+    ]
+
+
+class TestType6:
+    code = """
+type foo
+    x as integer
+    y as long
+    z as integer
+end type
+
+type bar
+    f as foo
+    g as long
+end type
+
+sub alter(x as foo, y as long)
+    dim a as foo
+    a.y = y
+    x = a
+end sub
+
+dim a(10) as foo
+dim b(10) as bar
+
+alter a(5), 100
+alter b(5).f, 200
+
+print a(5).y; b(5).f.y
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100  200 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
