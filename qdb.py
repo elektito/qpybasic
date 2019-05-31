@@ -3,6 +3,7 @@
 import cmd
 import struct
 import asm
+import argparse
 from vm import Machine
 
 class Cmd(cmd.Cmd):
@@ -150,10 +151,16 @@ after call is reached.
 
 
 def main():
-    import sys
-    filename = sys.argv[1]
+    parser = argparse.ArgumentParser(
+        description='qpybasic interactive debugger')
 
-    machine = Machine.load(sys.argv[1])
+    parser.add_argument(
+        'module_file',
+        help='The module file to load and debug.')
+
+    args = parser.parse_args()
+
+    machine = Machine.load(args.module_file)
     Cmd(machine).cmdloop()
     machine.shutdown()
 
