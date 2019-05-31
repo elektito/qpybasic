@@ -114,7 +114,7 @@ usage of it.
 
 
     @staticmethod
-    def from_name( name):
+    def from_name(name):
         return instr_name_to_instr[name]
 
 
