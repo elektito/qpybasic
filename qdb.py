@@ -37,7 +37,8 @@ Type help or ? to list commands.
         text_fmt = [o.text_fmt for o in instruction.operands]
 
         args = self.machine.mem.read(instruction.size - 1)
-        instr = self.format_instr(instruction.name, args, bin_fmt, text_fmt)
+        args = asm.format_instr_args(args, bin_fmt, text_fmt)
+        instr = f'{instruction.name} {args}'
         print(f'NEXT UP: {instr}')
 
 
@@ -45,27 +46,6 @@ Type help or ? to list commands.
         self.machine.mem.seek(self.machine.ip)
         opcode = self.machine.mem.read_byte()
         return asm.opcode_to_instr[opcode]
-
-
-    def format_instr(self, name, args, bin_fmt, text_fmt):
-        args = struct.unpack('>' + bin_fmt, args)
-        assert len(args) == len(text_fmt)
-        fargs = []
-        for arg, fmt in zip(args, text_fmt):
-            if fmt in ['hex1', 'hex2', 'hex4']:
-                n = int(fmt[-1]) * 2 + 2 # two digits per byte plus two more for 0x
-                farg = f'{arg:#0{n}x}'
-            elif fmt == 'float':
-                farg = str(arg)
-            elif fmt == 'decimal':
-                farg = str(arg)
-            else:
-                assert False, f'Unknown arg format: {fmt}'
-
-            fargs.append(farg)
-
-        fargs = ', '.join(fargs)
-        return f'{name} {fargs}'
 
 
     def print_mem(self, addr):

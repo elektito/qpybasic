@@ -1,5 +1,9 @@
+#!/usr/bin/env python3
+
 import struct
+import argparse
 from functools import partial
+from module import Module, Sections
 
 opcode_to_instr = {}
 instr_name_to_instr = {}
@@ -113,6 +117,12 @@ usage of it.
         return 1 + sum(i.size for i in self.operands)
 
 
+    @property
+    def bin_fmt(self):
+        "The binary format of the operands of this instruction."
+        return ''.join(o.bin_fmt for o in self.operands)
+
+
     @staticmethod
     def from_name(name):
         return instr_name_to_instr[name]
@@ -121,6 +131,76 @@ usage of it.
     @staticmethod
     def from_opcode(opcode):
         return opcode_to_instr[opcode]
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Q-pie-Disassembler! Disassembles the code in a '
+        'given module file and outputs assembly.')
+
+    parser.add_argument(
+        'module_file',
+        help='The module file to disassemble.')
+
+    args = parser.parse_args()
+
+    with open(args.module_file, 'rb') as f:
+        module = f.read()
+
+    module = Module.parse(module)
+    code = module.sections[Sections.CODE]['data']
+    addr = module.sections[Sections.CODE]['addr']
+
+    i = 0
+
+    while i < len(code):
+        formatted, size = format_instr_from_stream(code[i:], addr + i)
+        print(formatted)
+        i += size
+
+
+def format_instr_from_stream(stream, addr=None):
+    """Given an instruction stream (as a bytes object), this function
+decodes one instruction from the beginning of the stream and formats
+it as human-readable assembly text.
+
+Return value is a (formatted_str, size) tuple in which `size` is the
+number of bytes read from the stream.
+
+    """
+    instruction = opcode_to_instr[stream[0]]
+    text_fmt = [o.text_fmt for o in instruction.operands]
+    args = stream[1:instruction.size]
+    formatted_args = format_instr_args(args, instruction.bin_fmt, text_fmt)
+
+    spaces = (max_instr_name_len - len(instruction.name) + 1) * ' '
+    formatted = f'{instruction.name}{spaces}{formatted_args}'
+
+    if addr:
+        formatted = f'{addr:08x}  ' + formatted
+
+    return formatted, instruction.size
+
+
+def format_instr_args(args, bin_fmt, text_fmt):
+    args = struct.unpack('>' + bin_fmt, args)
+    assert len(args) == len(text_fmt)
+    fargs = []
+    for arg, fmt in zip(args, text_fmt):
+        if fmt in ['hex1', 'hex2', 'hex4']:
+            n = int(fmt[-1]) * 2 + 2 # two digits per byte plus two more for 0x
+            farg = f'{arg:#0{n}x}'
+        elif fmt == 'float':
+            farg = str(arg)
+        elif fmt == 'decimal':
+            farg = str(arg)
+        else:
+            assert False, f'Unknown arg format: {fmt}'
+
+        fargs.append(farg)
+
+    fargs = ', '.join(fargs)
+    return f'{fargs}'
 
 
 def def_instr(opcode, name, *operands, stack=None):
@@ -224,3 +304,10 @@ def_instr(0x5d, 'div%', stack=-2)
 def_instr(0x5e, 'div&', stack=-4)
 def_instr(0x5f, 'div!', stack=-4)
 def_instr(0x60, 'div#', stack=-8)
+
+# maximum instruction name length, calculated here for formatting
+# purposes.
+max_instr_name_len = max(len(name) for name in instr_name_to_instr)
+
+if __name__ == '__main__':
+    main()
