@@ -829,6 +829,69 @@ end sub
     vevents = []
 
 
+class TestExitFor1:
+    code = """
+for i% = 1 to 10
+    print i%
+    if i% = 5 then
+       exit for
+    end if
+next
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 1 \n'),
+        ('print', ' 2 \n'),
+        ('print', ' 3 \n'),
+        ('print', ' 4 \n'),
+        ('print', ' 5 \n'),
+    ]
+
+
+class TestExitFor2:
+    code = """
+for i% = 1 to 10
+    for j% = 1 to 2
+        if i% > 3 then
+           exit for
+        end if
+        print i%; j%
+    next
+    print "foo"
+    if i% = 5 then
+       exit for
+    end if
+next
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 1  1 \n'),
+        ('print', ' 1  2 \n'),
+        ('print', 'foo\n'),
+        ('print', ' 2  1 \n'),
+        ('print', ' 2  2 \n'),
+        ('print', 'foo\n'),
+        ('print', ' 3  1 \n'),
+        ('print', ' 3  2 \n'),
+        ('print', 'foo\n'),
+        ('print', 'foo\n'),
+        ('print', 'foo\n'),
+    ]
+
+
+class TestExitFor3:
+    code = """
+exit for
+    """
+
+    cevents = [
+        ('error', EC.EXIT_FOR_INVALID)
+    ]
+    vevents = []
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

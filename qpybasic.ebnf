@@ -105,7 +105,7 @@ dimension: NUMERIC_LITERAL [TO_KW NUMERIC_LITERAL]
 
 end_stmt: END_CMD
 
-exit_stmt: EXIT_KW (SUB_KW | FUNCTION_KW)
+exit_stmt: EXIT_KW (SUB_KW | FUNCTION_KW | FOR_KW)
 
 goto_stmt: GOTO_KW (ID | NUMERIC_LITERAL)
 

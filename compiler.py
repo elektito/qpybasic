@@ -131,6 +131,7 @@ class ErrorCodes(IntEnum):
     ARGUMENT_COUNT_MISMATCH = 36
     EXIT_SUB_INVALID = 37
     EXIT_FUNC_INVALID = 38
+    EXIT_FOR_INVALID = 39
 
 
     def __str__(self):
@@ -242,6 +243,9 @@ class ErrorCodes(IntEnum):
 
             self.EXIT_FUNC_INVALID:
             'Exit sub only valid inside a FUNCTION',
+
+            self.EXIT_FOR_INVALID:
+            'EXIT not within FOR...NEXT',
         }.get(int(self), super().__str__())
 
 
@@ -918,6 +922,7 @@ class Compiler:
         self.default_array_base = 1
         self.user_defined_types = {}
         self.default_types = {}
+        self.exit_labels = []
 
         # map the names of declared subs/functions to a
         # DeclaredRoutine object which contains parameter types and
@@ -1167,6 +1172,15 @@ class Compiler:
             if self.cur_routine.type != 'function':
                 raise CompileError(EC.EXIT_FUNC_INVALID)
             self.instrs += [Instr('jmp', self.cur_routine.exit_label)]
+        elif target == 'for':
+            if self.exit_labels == []:
+                raise CompileError(EC.EXIT_FOR_INVALID)
+
+            type, label = self.exit_labels[-1]
+            if type != 'for':
+                raise CompileError(EC.EXIT_FOR_INVALID)
+
+            self.instrs += [Instr('jmp', label)]
         else:
             assert False
 
@@ -1201,6 +1215,7 @@ class Compiler:
 
         top_label = self.gen_label('for_top')
         end_label = self.gen_label('for_bottom')
+        self.exit_labels.append(('for', end_label))
         self.instrs += [Label(top_label),
                         Instr(f'readf{var.size}', var),
                         Instr(f'readf{end_var.size}', end_var),
@@ -1215,6 +1230,7 @@ class Compiler:
         self.instrs += Lvalue([var]).gen_write_instructions()
         self.instrs += [Instr('jmp', top_label),
                         Label(end_label)]
+        self.exit_labels.pop()
 
 
     def process_sub_block(self, ast):
