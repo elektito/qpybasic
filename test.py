@@ -745,6 +745,90 @@ print a(5).y; b(5).f.y
     ]
 
 
+class TestExitSub1:
+    code = """
+sub foo(n as integer)
+    n = 100
+    exit sub
+    n = 200
+end sub
+
+foo n%
+print n%
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n')
+    ]
+
+
+class TestExitSub2:
+    code = """
+exit sub
+    """
+
+    cevents = [
+        ('error', EC.EXIT_SUB_INVALID)
+    ]
+    vevents = []
+
+
+class TestExitSub3:
+    code = """
+function foo
+    exit sub
+end function
+    """
+
+    cevents = [
+        ('error', EC.EXIT_SUB_INVALID)
+    ]
+    vevents = []
+
+
+class TestExitFunc1:
+    code = """
+function foo%
+    foo = 100
+    exit function
+    foo = 200
+end function
+
+n% = foo
+print n%
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n')
+    ]
+
+
+class TestExitFunc2:
+    code = """
+exit function
+    """
+
+    cevents = [
+        ('error', EC.EXIT_FUNC_INVALID)
+    ]
+    vevents = []
+
+
+class TestExitFunc3:
+    code = """
+sub foo
+    exit function
+end sub
+    """
+
+    cevents = [
+        ('error', EC.EXIT_FUNC_INVALID)
+    ]
+    vevents = []
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

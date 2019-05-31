@@ -36,6 +36,7 @@ lineno: NUMERIC_LITERAL
      | deftype_stmt
      | dim_stmt
      | end_stmt
+     | exit_stmt
      | goto_stmt
      | let_stmt
      | print_stmt
@@ -104,6 +105,8 @@ dimension: NUMERIC_LITERAL [TO_KW NUMERIC_LITERAL]
 
 end_stmt: END_CMD
 
+exit_stmt: EXIT_KW (SUB_KW | FUNCTION_KW)
+
 goto_stmt: GOTO_KW (ID | NUMERIC_LITERAL)
 
 let_stmt: LET_KW? lvalue "=" expr
@@ -170,6 +173,7 @@ DOUBLE_KW: "double"i
 ELSE_KW: "else"i
 ELSEIF_KW: "elseif"i
 END_KW: "end"i
+EXIT_KW: "exit"i
 FOR_KW: "for"i
 FUNCTION_KW: "function"i
 GOTO_KW: "goto"i

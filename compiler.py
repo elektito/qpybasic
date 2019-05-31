@@ -129,6 +129,8 @@ class ErrorCodes(IntEnum):
     INVALID_USE_OF_DOT = 34
     INVALID_DEFTYPE = 35
     ARGUMENT_COUNT_MISMATCH = 36
+    EXIT_SUB_INVALID = 37
+    EXIT_FUNC_INVALID = 38
 
 
     def __str__(self):
@@ -233,7 +235,13 @@ class ErrorCodes(IntEnum):
             'Invalid DEFtype statement',
 
             self.ARGUMENT_COUNT_MISMATCH:
-            'Argument-count mismatch'
+            'Argument-count mismatch',
+
+            self.EXIT_SUB_INVALID:
+            'Exit sub only valid inside a SUB',
+
+            self.EXIT_FUNC_INVALID:
+            'Exit sub only valid inside a FUNCTION',
         }.get(int(self), super().__str__())
 
 
@@ -596,6 +604,11 @@ class Routine:
     @property
     def params(self):
         return [v for v in self.all_vars if v.klass == 'param']
+
+
+    @property
+    def exit_label(self):
+        return f'__{self.type}_{self.name}_exit'
 
 
     def __repr__(self):
@@ -1142,6 +1155,22 @@ class Compiler:
         self.instrs += [Instr('end')]
 
 
+    def process_exit_stmt(self, ast):
+        _, target = ast.children
+        target = target.value.lower()
+        if target == 'sub':
+            if self.cur_routine.type != 'sub' or \
+               self.cur_routine.name == '__main':
+                raise CompileError(EC.EXIT_SUB_INVALID)
+            self.instrs += [Instr('jmp', self.cur_routine.exit_label)]
+        elif target == 'function':
+            if self.cur_routine.type != 'function':
+                raise CompileError(EC.EXIT_FUNC_INVALID)
+            self.instrs += [Instr('jmp', self.cur_routine.exit_label)]
+        else:
+            assert False
+
+
     def process_for_block(self, ast):
         _, var, start, _, end, step, body, next_stmt = ast.children
         var = self.get_var(var)
@@ -1215,7 +1244,8 @@ class Compiler:
         self.compile_ast(body)
 
         arg_size = sum(v.size for v in self.cur_routine.params)
-        self.instrs += [Instr('unframe', self.cur_routine),
+        self.instrs += [Label(self.cur_routine.exit_label),
+                        Instr('unframe', self.cur_routine),
                         Instr('ret', arg_size)]
         self.cur_routine.instrs = self.instrs
 
@@ -1284,7 +1314,8 @@ class Compiler:
         self.compile_ast(body)
 
         arg_size = sum(v.size for v in self.cur_routine.params)
-        self.instrs += [Instr('unframe_r', self.cur_routine, ret_var),
+        self.instrs += [Label(self.cur_routine.exit_label),
+                        Instr('unframe_r', self.cur_routine, ret_var),
                         Instr(f'ret_r', arg_size, ftype.get_size())]
         self.cur_routine.instrs = self.instrs
 
