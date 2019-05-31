@@ -1367,6 +1367,14 @@ class Compiler:
         self.user_defined_types[type_name] = elements
 
 
+    def process_gosub_stmt(self, ast):
+        _, target = ast.children
+        if target.type == 'ID':
+            self.instrs += [Instr('call', target)]
+        else:
+            self.instrs += [Instr('call', f'__lineno_{target.value}')]
+
+
     def process_goto_stmt(self, ast):
         _, target = ast.children
         if target.type == 'ID':
@@ -1519,6 +1527,10 @@ class Compiler:
         self.instrs += sum(reversed(parts), []) + \
                        [Instr('pushi%', len(ast.children) - 1)] + \
                        [Instr('syscall', '__print')]
+
+
+    def process_return_stmt(self, ast):
+        self.instrs += [Instr('ret', 0)]
 
 
     def gen_label(self, prefix):

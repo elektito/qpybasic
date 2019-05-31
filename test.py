@@ -892,6 +892,52 @@ exit for
     vevents = []
 
 
+class TestGosub1:
+    code = """
+i% = 10
+gosub pr
+i% = 20
+gosub pr
+end
+
+pr:
+   print i%+1
+   return
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 11 \n'),
+        ('print', ' 21 \n'),
+    ]
+
+
+class TestGosub2:
+    code = """
+recs% = 0
+result% = 0
+i% = 10
+gosub pr
+print result%
+
+end
+
+pr:
+   result% = result% + i%
+   recs% = recs% + 1
+   if recs% = 5 then
+      return
+   end if
+   gosub pr
+   return
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 50 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

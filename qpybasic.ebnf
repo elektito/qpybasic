@@ -37,9 +37,11 @@ lineno: NUMERIC_LITERAL
      | dim_stmt
      | end_stmt
      | exit_stmt
+     | gosub_stmt
      | goto_stmt
      | let_stmt
      | print_stmt
+     | return_stmt
 
 for_block: _for_stmt block_body next_stmt
 
@@ -107,6 +109,8 @@ end_stmt: END_CMD
 
 exit_stmt: EXIT_KW (SUB_KW | FUNCTION_KW | FOR_KW)
 
+gosub_stmt: GOSUB_KW (ID | NUMERIC_LITERAL)
+
 goto_stmt: GOTO_KW (ID | NUMERIC_LITERAL)
 
 let_stmt: LET_KW? lvalue "=" expr
@@ -116,6 +120,8 @@ print_stmt: PRINT_KW (expr _print_sep)* expr
 
 _print_sep: SEMICOLON
           | COMMA
+
+return_stmt: RETURN_KW
 
 
 ?expr: addsub_expr
@@ -176,6 +182,7 @@ END_KW: "end"i
 EXIT_KW: "exit"i
 FOR_KW: "for"i
 FUNCTION_KW: "function"i
+GOSUB_KW: "gosub"i
 GOTO_KW: "goto"i
 IF_KW: "if"i
 INTEGER_KW: "integer"i
@@ -183,6 +190,7 @@ LET_KW: "let"i
 LONG_KW: "long"i
 NEXT_KW: "next"i
 PRINT_KW: "print"i
+RETURN_KW: "return"i
 SINGLE_KW: "single"i
 STEP_KW: "step"i
 STRING_KW: "string"i
