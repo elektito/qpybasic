@@ -1367,13 +1367,6 @@ class Compiler:
         self.user_defined_types[type_name] = elements
 
 
-    def process_next_stmt(self, ast):
-        # NEXT statements with a matching FOR will be processed by the
-        # process_for_block function. This will only be called when
-        # there is a NEXT without FOR.
-        raise CompileError('NEXT without FOR.')
-
-
     def process_goto_stmt(self, ast):
         _, target = ast.children
         if target.type == 'ID':
