@@ -1,8 +1,8 @@
 import struct
+import asm
 from collections import OrderedDict
 from enum import IntEnum, unique
 from lark import Lark, Token, Tree
-from asm import Instr
 from module import Module
 
 
@@ -1632,6 +1632,50 @@ class Compiler:
     def get_default_type(self, var_name):
         t = self.default_types.get(var_name[0], None)
         return t if t else Type('SINGLE')
+
+
+class Instr:
+    """An instance of this class, is a representation of an instruction in
+use, i.e. the instruction itself, plus the values of its arguments.
+
+    """
+
+    def __init__(self, name, *args):
+        self.name = name
+        self.operands = args
+        self.abstract_instruction = asm.Instruction.from_name(name)
+
+
+    @property
+    def size(self):
+        return self.abstract_instruction.size
+
+
+    @property
+    def opcode(self):
+        return self.abstract_instruction.opcode
+
+
+    def assemble(self, resolver):
+        fmt = ''.join(o.bin_fmt
+                      for o in self.abstract_instruction.operands)
+        operands = resolver(self)
+        assert all(isinstance(o, (int, float, str)) for o in operands)
+        code = bytes([self.opcode]) + struct.pack('>' + fmt, *operands)
+        assert len(code) == self.abstract_instruction.size
+        return code
+
+
+    def __repr__(self):
+        return f'<Instr {self.name} {self.operands}>'
+
+
+    def __str__(self):
+        args = ', '.join(str(i) for i in self.operands)
+        if len(self.name) >= 8:
+            return f'\t{self.name}\t{args}'
+        else:
+            return f'\t{self.name}\t\t{args}'
 
 
 class Assembler:

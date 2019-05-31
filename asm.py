@@ -91,50 +91,6 @@ IMM_DOUBLE = Operand('d', 'float')
 IMM_UL = Operand('i', 'hex4')
 
 
-class Instr:
-    """An instance of this class, is a representation of an instruction in
-use, i.e. the instruction itself, plus the values of its arguments.
-
-    """
-
-    def __init__(self, name, *args):
-        self.name = name
-        self.operands = args
-        self.abstract_instruction = Instruction.from_name(name)
-
-
-    @property
-    def size(self):
-        return self.abstract_instruction.size
-
-
-    @property
-    def opcode(self):
-        return self.abstract_instruction.opcode
-
-
-    def assemble(self, resolver):
-        fmt = ''.join(o.bin_fmt
-                      for o in self.abstract_instruction.operands)
-        operands = resolver(self)
-        assert all(isinstance(o, (int, float, str)) for o in operands)
-        code = bytes([self.opcode]) + struct.pack('>' + fmt, *operands)
-        assert len(code) == self.abstract_instruction.size
-        return code
-
-
-    def __repr__(self):
-        return f'<Instr {self.name} {self.operands}>'
-
-
-    def __str__(self):
-        args = ', '.join(str(i) for i in self.operands)
-        if len(self.name) >= 8:
-            return f'\t{self.name}\t{args}'
-        else:
-            return f'\t{self.name}\t\t{args}'
-
-
 class Instruction:
     """An instance of this class represents an instruction in the
 abstract, e.g. the 'add%' instruction in general and not a particular
