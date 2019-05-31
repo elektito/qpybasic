@@ -19,6 +19,9 @@ def main():
     parser.add_argument(
         '--output', '-o', default='a.mod',
         help='The output file. Defaults to "a.mod".')
+    parser.add_argument(
+        '--print-ast', '-p', action='store_true', default=False,
+        help='Just parses the input and displays the AST.')
 
     args = parser.parse_args()
 
@@ -29,6 +32,11 @@ def main():
         grammar_text = f.read()
 
     c = Compiler()
+    if args.print_ast:
+        ast = c.parser.parse(source)
+        print(ast.pretty())
+        exit(0)
+
     try:
         module = c.compile(source)
     except CompileError as e:
