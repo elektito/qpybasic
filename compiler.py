@@ -24,10 +24,6 @@ typespec_to_typename = {
     '$': 'STRING',
 }
 
-lvalue_aliases = ['var_or_no_arg_func',
-                  'func_call_or_idx',
-                  'dotted']
-
 
 def get_type_name(typespec):
     return {
@@ -726,7 +722,7 @@ class Expr:
                 if isinstance(a, Tree) and \
                    a.data == 'value' and \
                    isinstance(a.children[0], Tree) and \
-                   a.children[0].data in lvalue_aliases:
+                   a.children[0].data == 'lvalue':
                     lv = self.parent.create_lvalue_if_possible(a.children[0])
 
                 if isinstance(lv, Lvalue):
@@ -761,7 +757,7 @@ class Expr:
                 self.instrs += lv.gen_read_instructions()
                 self.type = lv.type
             else:
-                self.process_function_call(ast.children[0])
+                self.process_function_call(ast.children[0].children[0])
         elif v.type == 'STRING_LITERAL':
             self.parent.add_string_literal(v[1:-1])
             self.instrs += [Instr('pushi$', v.value)]
@@ -971,12 +967,14 @@ class Compiler:
         else:
             _, sub_name, args = ast.children
 
-        # due to some grammar conflicts, we're using a
-        # 'possibly_lvalue' as the sub name (instead of the more
-        # sensible ID). so here, we check whether it is in fact
-        # actually an ID.
+        # due to some grammar conflicts, we're using an 'lvalue' as
+        # the sub name (instead of the more sensible 'ID'). so here,
+        # we check whether it is in fact actually an ID.
         if isinstance(sub_name, Tree):
-            sub_name = sub_name.children[0].value
+            base, suffix = sub_name.children
+            if len(suffix.children) > 0 or len(base.children) > 1:
+                raise CompileError(EC.INVALID_SUB_NAME)
+            sub_name = base.children[0].value
         else:
             sub_name = sub_name.value
 
@@ -1001,7 +999,7 @@ class Compiler:
             if isinstance(a, Tree) and \
                a.data == 'value' and \
                isinstance(a.children[0], Tree) and \
-               a.children[0].data in lvalue_aliases:
+               a.children[0].data == 'lvalue':
                 lv = self.create_lvalue_if_possible(a.children[0])
 
             if isinstance(lv, Lvalue):
@@ -1390,10 +1388,14 @@ class Compiler:
         dest, expr = ast.children
         lv = self.create_lvalue_if_possible(dest)
         if lv == None:
-            if dest.data == 'var_or_no_arg_func':
-                # this is for the case of assigning to the function
-                # name in functions.
-                name = dest.children[0].value
+            # check for the case of assigning to the function name in
+            # functions (which won't be detected by
+            # `create_lvalue_if_possible` because the name is a
+            # function).
+            base, suffix = dest.children
+            if len(base.children) == 1 and \
+               len(suffix.children) == 0:
+                name = base.children[0].value
                 var = self.get_var(name)
                 lv = Lvalue([var])
 
@@ -1424,44 +1426,23 @@ class Compiler:
 
 
     def create_lvalue_if_possible(self, ast):
-        # this function receive a tree for the 'possibly_lvalue' rule,
-        # and attempts to create an lvalue from it. if not possible,
-        # None is returned.
+        # this function receive a tree for the 'lvalue' rule, and
+        # attempts to create an lvalue from it. if not possible, None
+        # is returned.
 
-        flattened = self.flatten_lvalue_tree(ast)
-        assert len(flattened) % 2 == 1
+        base, suffix = ast.children
 
-        if len(flattened) == 1 and \
-           self.is_function(flattened[0]):
-            return None
-        elif len(flattened) == 3 and \
-             flattened[1] == 'IDX' and \
-             self.is_function(flattened[0]):
+        if len(suffix.children) == 0 and \
+           self.is_function(base.children[0]):
             return None
         else:
-            flattened[0] = self.get_var(flattened[0])
-
-            for i in range(1, len(flattened), 2):
-                op = flattened[i]
-                if op == 'IDX':
-                    indices = [Expr(i, self) for i in flattened[i + 1]]
-                    flattened[i + 1] = indices
-
-            return Lvalue(flattened, compiler=self)
-
-
-    def flatten_lvalue_tree(self, tree):
-        if tree.data == 'var_or_no_arg_func':
-            return [tree.children[0].value]
-        elif tree.data == 'func_call_or_idx':
-            return [tree.children[0].value, 'IDX', tree.children[1].children]
-        elif tree.data == 'dotted':
-            return \
-                self.flatten_lvalue_tree(tree.children[0]) + \
-                ["DOT"] + \
-                self.flatten_lvalue_tree(tree.children[1])
-        else:
-            assert False, 'This should not have happened.'
+            ops = [self.get_var(base.children[0].value)]
+            if len(base.children) == 2:
+                indices = [Expr(i, self) for i in base.children[1].children]
+                ops += ['IDX', indices]
+            for i in suffix.children:
+                ops += ['DOT', i.value]
+            return Lvalue(ops, compiler=self)
 
 
     def process_print_stmt(self, ast):

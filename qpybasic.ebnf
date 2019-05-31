@@ -78,7 +78,7 @@ _block_body_item: block _NEWLINE
 
 type_block: TYPE_KW ID _nl (parameter_definition (COMMENT? | _nl))* END_KW TYPE_KW
 
-call_stmt: possibly_lvalue argument_list
+call_stmt: lvalue argument_list
          | CALL_KW ID ["(" argument_list ")"]
 
 argument_list: expr ("," expr)*
@@ -106,7 +106,7 @@ end_stmt: END_CMD
 
 goto_stmt: GOTO_KW (ID | NUMERIC_LITERAL)
 
-let_stmt: LET_KW? possibly_lvalue "=" expr
+let_stmt: LET_KW? lvalue "=" expr
 
 print_stmt: PRINT_KW (expr _print_sep)* expr
           | PRINT_KW expr [_print_sep]
@@ -137,11 +137,13 @@ _print_sep: SEMICOLON
 
 value: NUMERIC_LITERAL
      | STRING_LITERAL
-     | possibly_lvalue
+     | lvalue
 
-possibly_lvalue: ID                                   -> var_or_no_arg_func
-               | ID "(" argument_list ")"             -> func_call_or_idx
-               | possibly_lvalue "." possibly_lvalue  -> dotted
+lvalue: lv_base lv_suffix
+
+lv_base: ID ["(" argument_list ")"]
+
+lv_suffix: ("." ID)*
 
 _NEWLINE: "\n"
         | "\r\n"
