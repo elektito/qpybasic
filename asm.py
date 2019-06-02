@@ -204,6 +204,8 @@ def format_instr_args(args, bin_fmt, text_fmt):
 
 
 def def_instr(opcode, name, *operands, stack=None):
+    if opcode in opcode_to_instr or name in instr_name_to_instr:
+        raise RuntimeError('Duplicate instruction definition.')
     instr = Instruction(opcode, name, operands, stack=stack)
     opcode_to_instr[opcode] = instr
     instr_name_to_instr[name] = instr
