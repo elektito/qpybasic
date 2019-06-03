@@ -7,6 +7,7 @@ import asm
 import logging.config
 from mmap import mmap
 from functools import reduce
+from enum import IntEnum, unique
 from compiler import Module
 
 
@@ -14,6 +15,41 @@ TRUE = struct.pack('>h', -1)
 FALSE = struct.pack('>h', 0)
 
 logger = logging.getLogger(__name__)
+
+
+@unique
+class ErrorCodes(IntEnum):
+    INVALID_ARRAY_BOUNDS = 1
+    INVALID_MEMSET_VALUE = 2
+    SUBSCRIPT_OUT_OF_RANGE = 3
+
+
+    def __str__(self):
+        return {
+            self.INVALID_ARRAY_BOUNDS:
+            'Invalid array bounds',
+
+            self.INVALID_MEMSET_VALUE:
+            'Invalid value for memset',
+
+            self.SUBSCRIPT_OUT_OF_RANGE:
+            'Subscript out of range',
+        }.get(int(self), super().__str__())
+
+
+RE = ErrorCodes
+
+
+class MachineRuntimeError(Exception):
+    def __init__(self, code, msg=None):
+        assert isinstance(code, ErrorCodes)
+
+        if not msg:
+            msg = str(code)
+
+        self.code = code
+
+        super().__init__(msg)
 
 
 class Jump:
@@ -71,15 +107,20 @@ class Machine:
         instr = asm.opcode_to_instr[opcode]
         prev_sp = self.sp
         opname = safe_name(instr.name)
-        n = getattr(self, f'exec_{opname}')()
-        self.check_stack(instr, prev_sp, self.sp)
-        if isinstance(n, Jump):
-            # return value is an absolute jump.
-            self.ip = n.target
+        try:
+            n = getattr(self, f'exec_{opname}')()
+        except MachineRuntimeError as e:
+            self.event_handler(('error', e.code))
+            self.stopped = True
         else:
-            # return value is the number of bytes used from the
-            # instruction stream by the exec function.
-            self.ip += n + 1
+            self.check_stack(instr, prev_sp, self.sp)
+            if isinstance(n, Jump):
+                # return value is an absolute jump.
+                self.ip = n.target
+            else:
+                # return value is the number of bytes used from the
+                # instruction stream by the exec function.
+                self.ip += n + 1
 
 
     def parse_operands(self, instr):
@@ -910,7 +951,7 @@ class Machine:
             d_from, = struct.unpack('>h', self.pop(2))
             d_to, = struct.unpack('>h', self.pop(2))
             if d_from > d_to:
-                assert False, 'Invalid array bounds.'
+                raise MachineRuntimeError(RE.INVALID_ARRAY_BOUNDS)
             dims.append((d_from, d_to))
         ranges = [d_to - d_from + 1 for d_from, d_to in dims]
         size = reduce(lambda x, y: x*y, ranges) * element_size
@@ -932,7 +973,7 @@ class Machine:
         b = self.pop(2)
         b, = struct.unpack('>h', b)
         if b < 0 or b > 255:
-            assert False, 'Invalid value for memset.'
+            raise MachineRuntimeError(RE.INVALID_MEMSET_VALUE)
         self.mem.seek(addr)
         self.mem.write(n * bytes([b]))
 
@@ -954,16 +995,14 @@ class Machine:
             dims.append((d_from, d_to))
 
         if ndims != n_indices:
-            logger.error('Subscript out of range')
-            assert False
+            raise MachineRuntimeError(RE.SUBSCRIPT_OUT_OF_RANGE)
 
         offset = 0
         prev_dim_size = 1
         dims = reversed(dims)
         for idx, (d_from, d_to) in list(zip(indices, dims)):
             if idx < d_from or idx > d_to:
-                logger.error('Subscript out of range')
-                assert False
+                raise MachineRuntimeError(RE.SUBSCRIPT_OUT_OF_RANGE)
 
             offset += (idx - d_from) * prev_dim_size
 

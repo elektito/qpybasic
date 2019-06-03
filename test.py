@@ -6,7 +6,7 @@ import unittest
 import sys
 import argparse
 from compiler import Compiler, CompileError, EC
-from vm import Machine
+from vm import Machine, RE
 
 logger = logging.getLogger(__name__)
 
@@ -593,6 +593,32 @@ print x("foo")
         ('error', EC.TYPE_MISMATCH)
     ]
     vevents = []
+
+
+class TestArray6:
+    code = """
+dim x(10) as integer
+
+print x(11)
+    """
+
+    cevents = []
+    vevents = [
+        ('error', RE.SUBSCRIPT_OUT_OF_RANGE)
+    ]
+
+
+class TestArray7:
+    code = """
+dim x(5 to 10) as integer
+
+x(4) = 1
+    """
+
+    cevents = []
+    vevents = [
+        ('error', RE.SUBSCRIPT_OUT_OF_RANGE)
+    ]
 
 
 class TestType1:
