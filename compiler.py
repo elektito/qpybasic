@@ -322,8 +322,10 @@ class Type:
             array_size = 1
             for d_from, d_to in self.dimensions:
                 array_size *= d_to - d_from + 1
+            hdr_size = 2 + 2*2*len(self.dimensions)
         else:
             array_size = 1
+            hdr_size = 0
 
         if self.is_basic:
             return {
@@ -332,7 +334,7 @@ class Type:
                 'SINGLE': 4,
                 'DOUBLE': 8,
                 'STRING': 4,
-            }[self.name] * array_size
+            }[self.name] * array_size + hdr_size
         else:
             base_size = sum(e_type.get_size()
                             for e_name, e_type in self.elements)
@@ -491,6 +493,10 @@ class Lvalue:
 
         instrs += [Instr('pushi_ul', base_type.get_size()),
                    Instr('mul_ul')]
+
+        hdr_size = 2 + 2 * 2 * len(prev_type.dimensions)
+        instrs += [Instr('pushi_ul', hdr_size),
+                   Instr('add_ul')]
 
         return base_type, instrs
 
@@ -923,6 +929,8 @@ class Compiler:
         self.user_defined_types = {}
         self.default_types = {}
         self.exit_labels = []
+
+        self.add_string_literal('')
 
         # map the names of declared subs/functions to a
         # DeclaredRoutine object which contains parameter types and
@@ -1614,6 +1622,40 @@ class Compiler:
 
         container.add_var(var)
 
+        if var.klass == 'param':
+            pidx = var.container.params.index(var)
+            var.idx = 8 + sum(v.size for v in var.container.params[:pidx])
+        else:
+            lidx = var.container.local_vars.index(var)
+            var.idx = -sum(v.size for v in var.container.local_vars[:lidx+1])
+
+        if klass == 'local':
+            lv = Lvalue([var])
+
+            if var.type.is_array:
+                element_size = Type(var.type.get_base_type_name()).get_size()
+                init_instrs = []
+                for d_from, d_to in var.type.dimensions:
+                    init_instrs += [Instr('pushi%', d_to),
+                                    Instr('pushi%', d_from)]
+                init_instrs += [Instr('pushi%', len(var.type.dimensions)),
+                                Instr('pushi%', element_size)]
+                init_instrs += lv.gen_ref_instructions()
+                init_instrs += [Instr('syscall', '__init_array')]
+            elif var.type.is_basic:
+                if var.type.name == 'STRING':
+                    init_instrs = [Instr(f'pushi$', '""')]
+                else:
+                    init_instrs = [Instr(f'pushi{var.type.typespec}', 0)]
+                init_instrs += lv.gen_write_instructions()
+            else:
+                init_instrs = [Instr('pushi%', 0),
+                               Instr('pushi_ul', var.type.get_size())]
+                init_instrs += lv.gen_ref_instructions()
+                init_instrs += [Instr('syscall', '__memset')]
+
+            self.instrs += init_instrs
+
         return var
 
 
@@ -1632,13 +1674,6 @@ class Compiler:
                 break
         else:
             var = self.dim_var(used_name)
-
-        if var.klass == 'param':
-            pidx = var.container.params.index(var)
-            var.idx = 8 + sum(v.size for v in var.container.params[:pidx])
-        else:
-            lidx = var.container.local_vars.index(var)
-            var.idx = -sum(v.size for v in var.container.local_vars[:lidx+1])
 
         return var
 
@@ -1748,6 +1783,8 @@ class Assembler:
                     '__cls': 0x02,
                     '__concat': 0x03,
                     '__print': 0x04,
+                    '__init_array': 0x05,
+                    '__memset': 0x06,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:

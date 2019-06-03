@@ -6,6 +6,7 @@ import argparse
 import asm
 import logging.config
 from mmap import mmap
+from functools import reduce
 from compiler import Module
 
 
@@ -705,6 +706,12 @@ class Machine:
             logger.error('CONCAT not implemented yet. corruption might occur.')
         elif value == 0x04: #print
             self.syscall_print()
+        elif value == 0x05: # init_array
+            self.syscall_init_array()
+        elif value == 0x06: # memset
+            self.syscall_memset()
+        else:
+            logger.error('Invalid syscall number.')
         logger.debug('EXEC: syscall')
         return 2
 
@@ -887,6 +894,45 @@ class Machine:
             buf += '\n'
 
         self.event_handler(('print', buf))
+
+
+    def syscall_init_array(self):
+        addr = self.pop(4)
+        addr, = struct.unpack('>I', addr)
+        element_size = self.pop(2)
+        element_size, = struct.unpack('>h', element_size)
+        ndims = self.pop(2)
+        ndims, = struct.unpack('>h', ndims)
+        dims = []
+        for i in range(ndims):
+            d_from, = struct.unpack('>h', self.pop(2))
+            d_to, = struct.unpack('>h', self.pop(2))
+            if d_from > d_to:
+                assert False, 'Invalid array bounds.'
+            dims.append((d_from, d_to))
+        ranges = [d_to - d_from + 1 for d_from, d_to in dims]
+        size = reduce(lambda x, y: x*y, ranges) * element_size
+
+        self.mem.seek(addr)
+        self.mem.write(struct.pack('>h', ndims))
+        for d_from, d_to in dims:
+            self.mem.write(struct.pack('>h', d_from))
+            self.mem.write(struct.pack('>h', d_to))
+
+        self.mem.write(size * bytes([0]))
+
+
+    def syscall_memset(self):
+        addr = self.pop(4)
+        addr, = struct.unpack('>I', addr)
+        n = self.pop(4)
+        n, = struct.unpack('>I', n)
+        b = self.pop(2)
+        b, = struct.unpack('>h', b)
+        if b < 0 or b > 255:
+            assert False, 'Invalid value for memset.'
+        self.mem.seek(addr)
+        self.mem.write(n * bytes([b]))
 
 
     def error(self, msg):

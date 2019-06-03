@@ -563,6 +563,25 @@ next
     ]
 
 
+class TestArray4:
+    code = """
+dim x(10 to 14) as integer
+
+for i = 10 to 14
+    print x(i)
+next
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+        ('print', ' 0 \n'),
+        ('print', ' 0 \n'),
+        ('print', ' 0 \n'),
+        ('print', ' 0 \n'),
+    ]
+
+
 class TestType1:
     code = """
 type foo
@@ -742,6 +761,26 @@ print a(5).y; b(5).f.y
     cevents = []
     vevents = [
         ('print', ' 100  200 \n'),
+    ]
+
+
+class TestType6:
+    code = """
+type foo
+    x as integer
+    y as long
+    z as single
+    w as double
+end type
+
+dim x as foo
+
+print x.x=0; x.y=0; x.z=0; x.w=0
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '-1 -1 -1 -1 \n'),
     ]
 
 
