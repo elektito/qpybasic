@@ -582,6 +582,19 @@ next
     ]
 
 
+class TestArray5:
+    code = """
+dim x(10) as integer
+
+print x("foo")
+    """
+
+    cevents = [
+        ('error', EC.TYPE_MISMATCH)
+    ]
+    vevents = []
+
+
 class TestType1:
     code = """
 type foo

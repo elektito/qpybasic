@@ -710,6 +710,8 @@ class Machine:
             self.syscall_init_array()
         elif value == 0x06: # memset
             self.syscall_memset()
+        elif value == 0x07: # access_array
+            self.syscall_access_array()
         else:
             logger.error('Invalid syscall number.')
         logger.debug('EXEC: syscall')
@@ -933,6 +935,43 @@ class Machine:
             assert False, 'Invalid value for memset.'
         self.mem.seek(addr)
         self.mem.write(n * bytes([b]))
+
+
+    def syscall_access_array(self):
+        addr, = struct.unpack('>I', self.pop(4))
+        element_size, = struct.unpack('>h', self.pop(2))
+        n_indices, = struct.unpack('>h', self.pop(2))
+        indices = []
+        for i in range(n_indices):
+            indices.append(struct.unpack('>h', self.pop(2))[0])
+
+        # now read array header
+        self.mem.seek(addr)
+        ndims, = struct.unpack('>h', self.mem.read(2))
+        dims = []
+        for i in range(ndims):
+            d_from, d_to = struct.unpack('>hh', self.mem.read(4))
+            dims.append((d_from, d_to))
+
+        if ndims != n_indices:
+            logger.error('Subscript out of range')
+            assert False
+
+        offset = 0
+        prev_dim_size = 1
+        dims = reversed(dims)
+        for idx, (d_from, d_to) in list(zip(indices, dims)):
+            if idx < d_from or idx > d_to:
+                logger.error('Subscript out of range')
+                assert False
+
+            offset += (idx - d_from) * prev_dim_size
+
+        header_size = 2 + 2 * 2 * ndims
+        addr += header_size + offset * element_size
+        addr = struct.pack('>I', addr)
+
+        self.push(addr)
 
 
     def error(self, msg):

@@ -401,104 +401,36 @@ class Var:
 
 
 class Lvalue:
-    def __init__(self, lv_list, *, compiler=None):
-        assert lv_list
-
+    def __init__(self, base, *, indices=None, dots=[], compiler=None):
         self.compiler = compiler
 
-        self.base = lv_list[0]
-        self.ops = lv_list[1:]
-
-        # convert the list of operations into groups of two, like:
-        # [('IDX', args), ('DOT', element), ('DOT', element)]
-        self.ops = list(zip(self.ops[::2], self.ops[1::2]))
+        self.base = base
+        self.indices = indices
+        self.dots = dots
 
         self.set_type()
 
 
     def set_type(self):
-        # set self.type based on self.base and self.ops
+        # set self.type based on self.base and self.indices, and
+        # self.dots
 
         t = self.base.type
+        if self.indices:
+            t = self.compiler.get_type(t.get_base_type_name())
 
-        for op, arg in self.ops:
-            if op == 'IDX':
-                t = self.compiler.get_type(t.get_base_type_name())
-            elif op == 'DOT':
-                type_elements = self.compiler.user_defined_types.get(t.name)
-                if not type_elements:
-                    raise CompileError(EC.INVALID_USE_OF_DOT)
-                for e_name, e_type in type_elements:
-                    if e_name == arg:
-                        t = e_type
-                        break
-                else:
-                    raise CompileError(EC.ELEMENT_NOT_DEFINED)
+        for element in self.dots:
+            type_elements = self.compiler.user_defined_types.get(t.name)
+            if not type_elements:
+                raise CompileError(EC.INVALID_USE_OF_DOT)
+            for e_name, e_type in type_elements:
+                if e_name == element:
+                    t = e_type
+                    break
             else:
-                assert False
+                raise CompileError(EC.ELEMENT_NOT_DEFINED)
 
         self.type = t
-
-
-    def process_idx(self, prev_type, indices):
-        # this function calculates the byte-offset indicated by the
-        # given indices into the array the type of which is
-        # prev_type. we start from the last index, and work
-        # backwards. for the last, we just add the index value. for
-        # the one before that, we multiply the size of the last
-        # dimension by the value and then add it to what we had in the
-        # previous step. this will continue until the first index.
-        #
-        # for the array:
-        #    arr(n1 TO m1, n2 TO m2, n3 TO m3)
-        # when trying to access arr(x, y, z) the offset would be:
-        #    offset = (z - n3) + (y - n2) * (m3 - n3 + 1) + (x - n1) * (m3 - n3 + 1) * (m2 - n2 + 1)
-        #    offset *= size_of_cell_type
-        #
-        # as a more concrete example, for this array:
-        #    DIM arr(1 TO 5, 1 TO 5) AS LONG
-        # when accessing arr(5, 5):
-        #    offset = 4 + 5 * 4 => 24
-        #    offset *= 4        => 96
-        # given that the array has 100 cells, and (5, 5) is the last
-        # 4-byte cell, the offset 96 calculated is indeed correct.
-
-        base_type = self.compiler.get_type(prev_type.get_base_type_name())
-        base_size = base_type.get_size()
-        instrs = []
-
-        # push last offset first
-        instrs += indices[-1].instrs
-        t = indices[-1].type.typespec
-        instrs += [Instr(f'conv{t}_ul')]
-        d_from, d_to = prev_type.dimensions[-1]
-        if d_from != 0:
-            instrs += [Instr('pushi_ul', d_from),
-                       Instr('sub_ul')]
-
-        # now add the offsets for the higher dimensions
-        dim_size = 1
-        for i, (d_from, d_to) in enumerate(prev_type.dimensions[:-1]):
-            dim_size *= (d_to - d_from + 1)
-            instrs += [Instr('pushi_ul', dim_size)]
-            instrs += indices[i].instrs
-            t = indices[i].type.typespec
-            instrs += [Instr(f'conv{t}_ul')]
-
-            instrs += [Instr('pushi_ul', d_from),
-                       Instr('sub_ul')]
-
-            instrs += [Instr('mul_ul'),
-                       Instr('add_ul')]
-
-        instrs += [Instr('pushi_ul', base_type.get_size()),
-                   Instr('mul_ul')]
-
-        hdr_size = 2 + 2 * 2 * len(prev_type.dimensions)
-        instrs += [Instr('pushi_ul', hdr_size),
-                   Instr('add_ul')]
-
-        return base_type, instrs
 
 
     def process_dot(self, prev_type, element):
@@ -517,6 +449,38 @@ class Lvalue:
         return e_type, [Instr('pushi_ul', offset)]
 
 
+    def process_base_addr(self):
+        instrs = []
+
+        if self.base.byref:
+            addr_instrs = [Instr('readf4', self.base)]
+        else:
+            addr_instrs = [Instr('pushfp', self.base)]
+
+        if self.indices:
+            for i in reversed(self.indices):
+                instrs += i.instrs
+                if i.type.typespec != '%':
+                    if i.type.is_numeric:
+                        instrs += [Instr(f'conv{i.type.typespec}%')]
+                    else:
+                        raise CompileError(EC.TYPE_MISMATCH)
+
+            if self.base.type.is_array:
+                t = self.base.type.get_base_type_name()
+                element_size = self.compiler.get_type(t).get_size()
+            else:
+                element_size = self.base.type.size
+            instrs += [Instr('pushi%', len(self.indices)),
+                       Instr('pushi%', element_size)]
+            instrs += addr_instrs
+            instrs += [Instr('syscall', '__access_array')]
+        else:
+            instrs = addr_instrs
+
+        return instrs
+
+
     def gen_instructions(self, iname, *, ref=False):
         # iname is either 'read' or 'write'.
         #
@@ -526,7 +490,7 @@ class Lvalue:
         assert iname == 'write' or not ref
 
         size = self.type.get_size()
-        if self.ops == []:
+        if not self.indices and not self.dots:
             if self.base.byref:
                 instrs = [Instr('readf4', self.base)]
                 if not ref:
@@ -541,20 +505,12 @@ class Lvalue:
                     instrs = [Instr('pushfp', self.base)]
         else:
             # push base address on the stack
-            if self.base.byref:
-                instrs = [Instr('readf4', self.base)]
-            else:
-                instrs = [Instr('pushfp', self.base)]
+            instrs = self.process_base_addr()
 
             # calculate offset on the stack
             prev_type = self.base.type
-            for op, arg in self.ops:
-                if op == 'IDX':
-                    new_type, new_instrs = self.process_idx(prev_type, arg)
-                elif op == 'DOT':
-                    new_type, new_instrs = self.process_dot(prev_type, arg)
-                else:
-                    assert False
+            for element in self.dots:
+                new_type, new_instrs = self.process_dot(prev_type, element)
 
                 prev_type = new_type
                 instrs += new_instrs
@@ -1212,7 +1168,7 @@ class Compiler:
             self.gen_set_var_code(step_var, e)
         else:
             self.instrs += [Instr(f'pushi{var.type.typespec}', 1)]
-            self.instrs += Lvalue([step_var]).gen_write_instructions()
+            self.instrs += Lvalue(step_var).gen_write_instructions()
 
         end_var = self.get_var(self.gen_var('for_end', var.type.typespec))
         e = Expr(end, self)
@@ -1235,7 +1191,7 @@ class Compiler:
         self.instrs += [Instr(f'readf{var.size}', var),
                         Instr(f'readf{step_var.size}', step_var),
                         Instr(f'add{var.type.typespec}')]
-        self.instrs += Lvalue([var]).gen_write_instructions()
+        self.instrs += Lvalue(var).gen_write_instructions()
         self.instrs += [Instr('jmp', top_label),
                         Label(end_label)]
         self.exit_labels.pop()
@@ -1326,7 +1282,7 @@ class Compiler:
             self.instrs += [Instr(f'pushi$'), '""']
         else:
             self.instrs += [Instr(f'pushi{ftype.typespec}', 0)]
-        self.instrs += Lvalue([ret_var]).gen_write_instructions()
+        self.instrs += Lvalue(ret_var).gen_write_instructions()
 
         if name in self.declared_routines:
             defined_param_types = [v.type for v in self.cur_routine.params]
@@ -1453,7 +1409,7 @@ class Compiler:
                len(suffix.children) == 0:
                 name = base.children[0].value
                 var = self.get_var(name)
-                lv = Lvalue([var])
+                lv = Lvalue(var)
 
         if lv == None:
             raise CompileError(EC.INVALID_LVALUE)
@@ -1477,7 +1433,7 @@ class Compiler:
         else:
             self.instrs += expr.instrs + conv_instrs
 
-            lv = Lvalue([var])
+            lv = Lvalue(var)
             self.instrs += lv.gen_write_instructions()
 
 
@@ -1486,19 +1442,18 @@ class Compiler:
         # attempts to create an lvalue from it. if not possible, None
         # is returned.
 
+        indices = None
         base, suffix = ast.children
 
         if len(suffix.children) == 0 and \
            self.is_function(base.children[0]):
             return None
         else:
-            ops = [self.get_var(base.children[0].value)]
+            var = self.get_var(base.children[0].value)
             if len(base.children) == 2:
                 indices = [Expr(i, self) for i in base.children[1].children]
-                ops += ['IDX', indices]
-            for i in suffix.children:
-                ops += ['DOT', i.value]
-            return Lvalue(ops, compiler=self)
+            dots = [i.value for i in suffix.children]
+            return Lvalue(var, indices=indices, dots=dots, compiler=self)
 
 
     def process_print_stmt(self, ast):
@@ -1630,7 +1585,7 @@ class Compiler:
             var.idx = -sum(v.size for v in var.container.local_vars[:lidx+1])
 
         if klass == 'local':
-            lv = Lvalue([var])
+            lv = Lvalue(var)
 
             if var.type.is_array:
                 element_size = Type(var.type.get_base_type_name()).get_size()
@@ -1785,6 +1740,7 @@ class Assembler:
                     '__print': 0x04,
                     '__init_array': 0x05,
                     '__memset': 0x06,
+                    '__access_array': 0x07,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:
