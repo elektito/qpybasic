@@ -366,7 +366,7 @@ dim i as integer
 
 for i = 1 to 10
    call fib(i, r%)
-   print "fib"; i; r
+   print "fib"; i; r%
 next
 
 sub fib(n%, r%)
@@ -1074,6 +1074,133 @@ print x&
     cevents = []
     vevents = [
         ('print', ' 100 \n'),
+    ]
+
+
+class TestVars1:
+    code = """
+dim x as string
+x = "foo"
+print x
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
+class TestVars2:
+    code = """
+dim x as string
+x = "foo"
+print x$
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
+class TestVars3:
+    code = """
+dim x as string
+x$ = "foo"
+print x
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
+class TestVars4:
+    code = """
+dim x as string
+x$ = "foo"
+x& = 100
+    """
+
+    cevents = [
+        ('error', EC.DUP_DEF)
+    ]
+    vevents = []
+
+
+class TestVars5:
+    code = """
+x$ = "foo"
+dim x as string
+    """
+
+    cevents = [
+        ('error', EC.AS_CLAUSE_REQUIRED_ON_FIRST_DECL)
+    ]
+    vevents = []
+
+
+class TestVars6:
+    code = """
+x$ = "foo"
+dim x$
+    """
+
+    cevents = [
+        ('error', EC.DUP_DEF)
+    ]
+    vevents = []
+
+
+class TestVars7:
+    code = """
+dim x
+dim x as single
+    """
+
+    cevents = [
+        ('error', EC.AS_CLAUSE_REQUIRED_ON_FIRST_DECL)
+    ]
+    vevents = []
+
+
+class TestVars8:
+    code = """
+x$ = "foo"
+dim x as single
+    """
+
+    cevents = [
+        ('error', EC.DUP_DEF)
+    ]
+    vevents = []
+
+
+class TestVars9:
+    code = """
+dim x as string
+x = 100
+    """
+
+    cevents = [
+        ('error', EC.TYPE_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestVars10:
+    code = """
+x$ = "foo"
+x& = 100
+x% = 200
+
+print x$; x&; x%
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo 100  200 \n')
     ]
 
 

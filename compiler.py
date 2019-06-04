@@ -573,34 +573,51 @@ class Lvalue:
         return self.gen_instructions('write', ref=True)
 
 
-class Routine:
-    def __init__(self, name, type):
-        self.name = name
-        self.type = type
-        self.instrs = []
-        self.all_vars = []
+class VarContainer:
+    def __init__(self, compiler):
+        self.compiler = compiler
+        self.vars = []
 
 
     def add_var(self, var):
-        self.all_vars.append(var)
+        self.vars.append(var)
 
 
-    def lookup_var(self, name):
-        for v in self.all_vars:
-            if v.name == name:
+    def lookup_var(self, name, typespec, *, get_all=False):
+        matching = [v for v in self.vars if v.name == name]
+        if get_all:
+            return matching
+
+        for v in matching:
+            if typespec and v.type.typespec == typespec:
+                return v
+            if not typespec and not v.no_type_dimmed:
+                return v
+            if not typespec and \
+               v.type.typespec == self.compiler.get_default_type(name).typespec:
                 return v
 
         return None
 
 
+class Routine(VarContainer):
+    def __init__(self, name, type, compiler):
+        super().__init__(compiler)
+
+        self.name = name
+        self.type = type
+        self.compiler = compiler
+        self.instrs = []
+
+
     @property
     def local_vars(self):
-        return [v for v in self.all_vars if v.klass == 'local']
+        return [v for v in self.vars if v.klass == 'local']
 
 
     @property
     def params(self):
-        return [v for v in self.all_vars if v.klass == 'param']
+        return [v for v in self.vars if v.klass == 'param']
 
 
     @property
@@ -935,19 +952,6 @@ class DeclaredRoutine:
         self.ret_type = ret_type
 
 
-class ConstContainer:
-    def __init__(self):
-        self.consts = {}
-
-
-    def add_var(self, var):
-        self.consts[var.name] = var
-
-
-    def lookup_var(self, name):
-        return self.consts.get(name, None)
-
-
 class Compiler:
     def __init__(self):
         with open('qpybasic.ebnf') as f:
@@ -965,7 +969,7 @@ class Compiler:
         code += '\n'
 
         self.instrs = []
-        self.cur_routine = Routine('__main', 'sub')
+        self.cur_routine = Routine('__main', 'sub', self)
         self.routines = {'__main': self.cur_routine}
         self.gen_labels = {}
         self.gen_vars = {}
@@ -976,7 +980,7 @@ class Compiler:
         self.user_defined_types = {}
         self.default_types = {}
         self.exit_labels = []
-        self.const_container = ConstContainer()
+        self.const_container = VarContainer(self)
 
         self.add_string_literal('')
 
@@ -1196,14 +1200,25 @@ class Compiler:
             _, name = ast.children
             self.dim_var(name)
         else:
-            _, name, dimensions,  _, typename = ast.children
+            if len(ast.children) == 3:
+                _, name, dimensions = ast.children
+                typename = None
+            else:
+                _, name, dimensions,  _, typename = ast.children
+
             if dimensions.children:
                 dimensions = self.parse_dimensions(dimensions)
             else:
                 dimensions = None
-            typename = typename.children[0].value
+
+            if typename:
+                typename = typename.children[0].value
+                type = self.get_type(typename, dimensions=dimensions)
+            else:
+                type = None
+
             self.dim_var(name,
-                         type=self.get_type(typename, dimensions=dimensions),
+                         type=type,
                          dimensions=dimensions)
 
 
@@ -1312,7 +1327,7 @@ class Compiler:
 
         saved_instrs = self.instrs
         self.instrs = []
-        self.cur_routine = Routine(name.value, 'sub')
+        self.cur_routine = Routine(name.value, 'sub', self)
 
         self.instrs += [Label(f'__sub_{name}'),
                         Instr('frame', self.cur_routine)]
@@ -1367,7 +1382,7 @@ class Compiler:
 
         saved_instrs = self.instrs
         self.instrs = []
-        self.cur_routine = Routine(name, 'function')
+        self.cur_routine = Routine(name, 'function', self)
         self.cur_routine.ret_type = ftype
 
         self.instrs += [Label(f'__function_{name}'),
@@ -1646,6 +1661,8 @@ class Compiler:
         assert klass in ['local', 'param', 'const']
         assert klass == 'param' or not byref
 
+        no_type = (type == None)
+
         if used_name[-1] in typespec_chars:
             name = used_name[:-1]
             typespec = used_name[-1]
@@ -1660,11 +1677,28 @@ class Compiler:
             if not type:
                 type = self.get_default_type(used_name)
 
-        containers = [self.cur_routine]
+        containers = [self.cur_routine, self.const_container]
         for c in containers:
-            var = c.lookup_var(name)
+            var = c.lookup_var(name, typespec)
             if var:
                 if var.no_type_dimmed and not typespec:
+                    raise CompileError(EC.AS_CLAUSE_REQUIRED_ON_FIRST_DECL)
+                else:
+                    raise CompileError(EC.DUP_DEF)
+
+            # if there has been a variable declared before this, with
+            # a full 'dim v as type' statement, it's still a duplicate
+            # even if the typespec char doesn't match.
+            var = c.lookup_var(name, None)
+            if var and not var.no_type_dimmed:
+                raise CompileError(EC.DUP_DEF)
+
+            # if there has been any type (fully typed or not,
+            # including implicit) of declaration with this name
+            # before, and this is a fully typed dim
+            same_named = c.lookup_var(name, None, get_all=True)
+            if not no_type and same_named:
+                if same_named[0].type == type:
                     raise CompileError(EC.AS_CLAUSE_REQUIRED_ON_FIRST_DECL)
                 else:
                     raise CompileError(EC.DUP_DEF)
@@ -1680,7 +1714,7 @@ class Compiler:
         var.name = name
         var.type = type
         var.container = container
-        var.no_type_dimmed = (typespec != None)
+        var.no_type_dimmed = no_type
         var.klass = klass
         var.byref = byref
 
@@ -1733,7 +1767,7 @@ class Compiler:
 
         containers = [self.cur_routine, self.const_container]
         for c in containers:
-            var = c.lookup_var(name)
+            var = c.lookup_var(name, typespec)
             if var:
                 break
         else:
