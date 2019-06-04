@@ -17,13 +17,13 @@ def main():
         '--dump-asm', '-d', action='store_true', default=False,
         help='Dump assembly output to stdout.')
     parser.add_argument(
-        '--output', '-o', default='a.mod',
+        '--output', '-o', default='a.mod', metavar='OUTPUT_FILE',
         help='The output file. Defaults to "a.mod".')
     parser.add_argument(
         '--print-ast', '-p', action='store_true', default=False,
         help='Just parses the input and displays the AST.')
     parser.add_argument(
-        '--optimize', '-O', type=int, default=0,
+        '--optimize', '-O', type=int, default=0, metavar='LEVEL',
         help='Sets the optimization level. Defaults to 0. Currently '
         'only one optimization level is supported which is enabled '
         'for any value greater than zero.')
