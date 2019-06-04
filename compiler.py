@@ -132,6 +132,8 @@ class ErrorCodes(IntEnum):
     EXIT_SUB_INVALID = 37
     EXIT_FUNC_INVALID = 38
     EXIT_FOR_INVALID = 39
+    INVALID_CONSTANT = 40
+    CANNOT_ASSIGN_TO_CONST = 41
 
 
     def __str__(self):
@@ -246,6 +248,12 @@ class ErrorCodes(IntEnum):
 
             self.EXIT_FOR_INVALID:
             'EXIT not within FOR...NEXT',
+
+            self.INVALID_CONSTANT:
+            'Invalid constant',
+
+            self.CANNOT_ASSIGN_TO_CONST:
+            'Cannot assign to const',
         }.get(int(self), super().__str__())
 
 
@@ -481,6 +489,33 @@ class Lvalue:
         return instrs
 
 
+    def process_param_or_local(self, iname, ref):
+        size = self.type.get_size()
+        if self.base.byref:
+            instrs = [Instr('readf4', self.base)]
+            if not ref:
+                instrs += [Instr(f'{iname}i{size}')]
+        else:
+            if not ref:
+                if size in [1, 2, 4, 8]:
+                    instrs = [Instr(f'{iname}f{size}', self.base)]
+                else:
+                    instrs = [Instr(f'{iname}f_n', size, self.base)]
+            else:
+                instrs = [Instr('pushfp', self.base)]
+
+        return instrs
+
+
+    def process_const(self):
+        if self.base.type.is_numeric:
+            instrs = [Instr(f'pushi{self.base.type.typespec}', self.base.const_value)]
+        else:
+            instrs = [Instr(f'pushi$', f'"{self.base.const_value}"')]
+
+        return instrs
+
+
     def gen_instructions(self, iname, *, ref=False):
         # iname is either 'read' or 'write'.
         #
@@ -491,18 +526,14 @@ class Lvalue:
 
         size = self.type.get_size()
         if not self.indices and not self.dots:
-            if self.base.byref:
-                instrs = [Instr('readf4', self.base)]
-                if not ref:
-                    instrs += [Instr(f'{iname}i{size}')]
+            if self.base.klass in ['param', 'local']:
+                instrs = self.process_param_or_local(iname, ref)
+            elif self.base.klass == 'const':
+                if iname != 'read':
+                    raise CompileError(EC.CANNOT_ASSIGN_TO_CONST)
+                instrs = self.process_const()
             else:
-                if not ref:
-                    if size in [1, 2, 4, 8]:
-                        instrs = [Instr(f'{iname}f{size}', self.base)]
-                    else:
-                        instrs = [Instr(f'{iname}f_n', size, self.base)]
-                else:
-                    instrs = [Instr('pushfp', self.base)]
+                assert False
         else:
             # push base address on the stack
             instrs = self.process_base_addr()
@@ -589,7 +620,9 @@ class Routine:
 class Expr:
     def __init__(self, ast, parent):
         self.parent = parent
-        self.instrs = []
+        self._instrs = []
+        self.is_const = False
+        self.const_value = None
         self.compile_ast(ast)
 
 
@@ -673,7 +706,7 @@ class Expr:
 
         if fname in builtin_functions:
             f = builtin_functions[fname]
-            self.type, self.instrs = f(self.parent, args)
+            self.type, self._instrs = f(self.parent, args)
             if called_type and self.type != called_type:
                 raise CompileError(EC.FUNC_RET_TYPE_MISMATCH)
         else:
@@ -712,7 +745,7 @@ class Expr:
                     else:
                         if lv.type != self.parent.declared_routines[fname].param_types[i]:
                             raise CompileError(EC.PARAM_TYPE_MISMATCH)
-                    self.instrs += lv.gen_ref_instructions()
+                    self._instrs += lv.gen_ref_instructions()
                 else:
                     e = Expr(a, self.parent)
                     if fname in self.parent.routines:
@@ -721,11 +754,11 @@ class Expr:
                         typespec = self.parent.declared_routines[fname].param_types[i].typespec
                     v = self.parent.get_var(self.parent.gen_var('rvalue', typespec))
                     self.parent.gen_set_var_code(v, e)
-                    self.instrs += [Instr('pushfp', v)]
+                    self._instrs += [Instr('pushfp', v)]
 
                 i -= 1
 
-            self.instrs += [Instr('call', f'__function_{fname}')]
+            self._instrs += [Instr('call', f'__function_{fname}')]
 
 
     def process_value(self, ast):
@@ -733,22 +766,31 @@ class Expr:
         if isinstance(v, Tree):
             lv = self.parent.create_lvalue_if_possible(ast.children[0])
             if lv:
-                self.instrs += lv.gen_read_instructions()
+                self._instrs += lv.gen_read_instructions()
                 self.type = lv.type
+                if not lv.indices and not lv.dots:
+                    self.is_const = (lv.base.klass == 'const')
+                    if self.is_const:
+                        self.const_value = lv.base.const_value
             else:
                 self.process_function_call(ast.children[0].children[0])
         elif v.type == 'STRING_LITERAL':
             self.parent.add_string_literal(v[1:-1])
-            self.instrs += [Instr('pushi$', v.value)]
+            self._instrs += [Instr('pushi$', v.value)]
             self.type = Type('$')
+            self.is_const = True
+            self.const_value = v.value[1:-1]
         elif v.type == 'NUMERIC_LITERAL':
             t = get_literal_type(v.value)
             if t.name.lower() in ['integer', 'long']:
                 value = int(v.value)
             else:
                 value = float(v.value)
-            self.instrs += [Instr('pushi' + t.typespec, value)]
+            self._instrs += [Instr('pushi' + t.typespec, value)]
             self.type = t
+            self.is_const = True
+            self.const_value = int(value) if t.typespec in ('%', '&') \
+                               else float(value)
         else:
             assert False, 'This should not have happened.'
 
@@ -756,15 +798,36 @@ class Expr:
     def process_negation(self, ast):
         arg = ast.children[0]
         e = Expr(arg, self.parent)
-        self.instrs += e.instrs + [Instr(f'neg{e.type.typespec}')]
+        self._instrs += e.instrs + [Instr(f'neg{e.type.typespec}')]
         self.type = e.type
+        self.is_const = e.is_const
+        self.const_value = e.const_value
+
+
+    def calc_binary_const(self, op, left, right):
+        l, r = left.const_value, right.const_value
+        result = {
+            'add': l + r,
+            'sub': l - r,
+            'mul': l * r,
+            'div': l / r,
+        }[op]
+
+        if all(v.type.typespec in ('%', '&') for v in (left, right)):
+            result = int(result)
+
+        self.const_value = result
 
 
     def binary_op(self, op, left, right):
+        self.is_const = left.is_const and right.is_const
+        if self.is_const:
+            self.calc_binary_const(op, left, right)
+
         ltype, rtype = left.type.typespec, right.type.typespec
 
         if ltype == rtype == '$' and op == 'add':
-            self.instrs += [Instr('syscall', '__concat')]
+            self._instrs += [Instr('syscall', '__concat')]
             self.type = Type('$')
             return
         elif not left.type.is_numeric or not right.type.is_numeric:
@@ -791,14 +854,29 @@ class Expr:
         instrs += [Instr(op + t)]
 
         self.type = Type(t)
-        self.instrs += instrs
+        self._instrs += instrs
 
 
     def compare_op(self, op, left, right):
         self.binary_op('sub', left, right)
-        self.instrs += gen_conv_instrs(self.type, Type('%'))
-        self.instrs += [Instr(op)]
+        self._instrs += gen_conv_instrs(self.type, Type('%'))
+        self._instrs += [Instr(op)]
         self.type = Type('%')
+
+        if self.is_const:
+            self.const_value = {
+                'eq': self.const_value == 0,
+                'ne': self.const_value != 0,
+                'lt': self.const_value < 0,
+                'gt': self.const_value > 0,
+                'le': self.const_value <= 0,
+                'ge': self.const_value >= 0,
+            }[op]
+
+
+    @property
+    def instrs(self):
+        return self._instrs
 
 
 class Label:
@@ -857,6 +935,19 @@ class DeclaredRoutine:
         self.ret_type = ret_type
 
 
+class ConstContainer:
+    def __init__(self):
+        self.consts = {}
+
+
+    def add_var(self, var):
+        self.consts[var.name] = var
+
+
+    def lookup_var(self, name):
+        return self.consts.get(name, None)
+
+
 class Compiler:
     def __init__(self):
         with open('qpybasic.ebnf') as f:
@@ -885,6 +976,7 @@ class Compiler:
         self.user_defined_types = {}
         self.default_types = {}
         self.exit_labels = []
+        self.const_container = ConstContainer()
 
         self.add_string_literal('')
 
@@ -1010,6 +1102,21 @@ class Compiler:
 
     def process_cls_stmt(self, ast):
         self.instrs += [Instr('syscall', '__cls')]
+
+
+    def process_const_stmt(self, ast):
+        _, name, value = ast.children
+        value = Expr(value, self)
+        if not value.is_const:
+            raise CompileError(EC.INVALID_CONSTANT)
+        var = self.dim_var(name, klass='const')
+        if var.type.typespec in ['%', '&']:
+            conv = int
+        elif var.type.typespec in ['!', '#']:
+            conv = float
+        else:
+            conv = str
+        var.const_value = conv(value.const_value)
 
 
     def process_declare_stmt(self, ast):
@@ -1536,7 +1643,7 @@ class Compiler:
 
     def dim_var(self, used_name, *,
                 klass='local', byref=False, type=None, dimensions=None):
-        assert klass in ['local', 'param']
+        assert klass in ['local', 'param', 'const']
         assert klass == 'param' or not byref
 
         if used_name[-1] in typespec_chars:
@@ -1564,6 +1671,8 @@ class Compiler:
 
         if klass in ['local', 'param']:
             container = self.cur_routine
+        elif klass == 'const':
+            container = self.const_container
         else:
             assert False, 'This should not happen!'
 
@@ -1580,7 +1689,7 @@ class Compiler:
         if var.klass == 'param':
             pidx = var.container.params.index(var)
             var.idx = 8 + sum(v.size for v in var.container.params[:pidx])
-        else:
+        elif var.klass == 'local':
             lidx = var.container.local_vars.index(var)
             var.idx = -sum(v.size for v in var.container.local_vars[:lidx+1])
 
@@ -1622,7 +1731,7 @@ class Compiler:
             name = used_name
             typespec = None
 
-        containers = [self.cur_routine]
+        containers = [self.cur_routine, self.const_container]
         for c in containers:
             var = c.lookup_var(name)
             if var:

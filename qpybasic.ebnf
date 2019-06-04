@@ -32,6 +32,7 @@ lineno: NUMERIC_LITERAL
 
 ?stmt: call_stmt
      | cls_stmt
+     | const_stmt
      | declare_stmt
      | deftype_stmt
      | dim_stmt
@@ -88,6 +89,8 @@ argument_list: expr ("," expr)*
              |
 
 cls_stmt: CLS_KW
+
+const_stmt: CONST_KW ID "=" expr
 
 declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) ID (parameter_list | "(" ")" )
 
@@ -168,6 +171,7 @@ STRING_LITERAL: /"[^"]*"/
 AS_KW: "as"i
 CALL_KW: "call"i
 CLS_KW: "cls"i
+CONST_KW: "const"i
 DECLARE_KW: "declare"i
 DEFDBL_KW: "defdbl"i
 DEFINT_KW: "defint"i

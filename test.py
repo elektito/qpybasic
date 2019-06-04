@@ -1016,6 +1016,67 @@ pr:
     ]
 
 
+class TestConst1:
+    code = """
+const x& = 100
+print x&
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n'),
+    ]
+
+
+class TestConst2:
+    code = """
+const x! = 100 - 20
+const y& = (2 * x!) / 4 + 1
+print y&
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 41 \n'),
+    ]
+
+
+class TestConst3:
+    code = """
+y = 100
+const x = y
+    """
+
+    cevents = [
+        ('error', EC.INVALID_CONSTANT)
+    ]
+    vevents = []
+
+
+class TestConst4:
+    code = """
+const x = 10
+x = 11
+    """
+
+    cevents = [
+        ('error', EC.CANNOT_ASSIGN_TO_CONST)
+    ]
+    vevents = []
+
+
+class TestConst5:
+    code = """
+const x& = 100.5
+print x&
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
