@@ -893,7 +893,13 @@ class Expr:
 
     @property
     def instrs(self):
-        return self._instrs
+        if self.parent.optimization > 0 and self.is_const:
+            if self.type.is_numeric:
+                return [Instr(f'pushi{self.type.typespec}', self.const_value)]
+            else:
+                return [Instr(f'pushi$', f'"{self.const_value}"')]
+        else:
+            return self._instrs
 
 
 class Label:
@@ -953,7 +959,7 @@ class DeclaredRoutine:
 
 
 class Compiler:
-    def __init__(self):
+    def __init__(self, optimization=0):
         with open('qpybasic.ebnf') as f:
             grammar_text = f.read()
 
@@ -963,6 +969,8 @@ class Compiler:
                            postlex=PostLex(self),
                            propagate_positions=True,
                            start='program')
+
+        self.optimization = optimization
 
 
     def compile(self, code):

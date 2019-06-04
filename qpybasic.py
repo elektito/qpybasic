@@ -22,6 +22,11 @@ def main():
     parser.add_argument(
         '--print-ast', '-p', action='store_true', default=False,
         help='Just parses the input and displays the AST.')
+    parser.add_argument(
+        '--optimize', '-O', type=int, default=0,
+        help='Sets the optimization level. Defaults to 0. Currently '
+        'only one optimization level is supported which is enabled '
+        'for any value greater than zero.')
 
     args = parser.parse_args()
 
@@ -31,7 +36,7 @@ def main():
     with open('qpybasic.ebnf') as f:
         grammar_text = f.read()
 
-    c = Compiler()
+    c = Compiler(optimization=args.optimize)
     if args.print_ast:
         ast = c.parser.parse(source)
         print(ast.pretty())
