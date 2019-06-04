@@ -261,6 +261,15 @@ class Machine:
         return 0
 
 
+    def exec_conv_long_single(self):
+        value = self.pop(4)
+        value, = struct.unpack('>i', value)
+        value = struct.pack('>f', value)
+        self.push(value)
+        logger.debug('EXEC: conv&%')
+        return 0
+
+
     def exec_conv_single_integer(self):
         value = self.pop(4)
         value, = struct.unpack('>f', value)
