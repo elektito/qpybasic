@@ -824,7 +824,8 @@ class Expr:
         self._instrs += e.instrs + [Instr(f'neg{e.type.typespec}')]
         self.type = e.type
         self.is_const = e.is_const
-        self.const_value = -e.const_value
+        if self.is_const:
+            self.const_value = -e.const_value
 
 
     def calc_binary_const(self, op, left, right):
