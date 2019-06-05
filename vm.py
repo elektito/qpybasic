@@ -78,6 +78,10 @@ class Machine:
         elif event_name == 'print':
             buf, = args
             print(buf, end='')
+        elif event_name == 'error':
+            code, = args
+            msg = str(ErrorCodes(code))
+            logger.error(f'Machine error: {msg}')
         else:
             logger.error(f'Unknown machine event: {event_name}')
 
