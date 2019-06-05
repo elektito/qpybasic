@@ -1344,6 +1344,31 @@ foo x
     vevents = []
 
 
+class TestLogical1:
+    code = """
+print not 1800
+print 199001 and 2333
+print 49 or 87
+print 2300 xor 1877
+print 199 eqv 44
+print 999 imp 777
+print 2291 or 4344 and not 1616 eqv 209 imp 7004
+print 100 xor 22.29
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '-1801 \n'),
+        ('print', ' 2329 \n'),
+        ('print', ' 119 \n'),
+        ('print', ' 4009 \n'),
+        ('print', '-236 \n'),
+        ('print', '-231 \n'),
+        ('print', ' 7038 \n'),
+        ('print', ' 114 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

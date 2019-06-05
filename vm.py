@@ -222,6 +222,30 @@ class Machine:
         return 0
 
 
+    def exec_and_integer(self):
+        y = self.pop(2)
+        x = self.pop(2)
+        y, = struct.unpack('>h', y)
+        x, = struct.unpack('>h', x)
+        result = x & y
+        result = struct.pack('>h', result)
+        self.push(result)
+        logger.debug('EXEC: and%')
+        return 0
+
+
+    def exec_and_long(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>i', y)
+        x, = struct.unpack('>i', x)
+        result = x & y
+        result = struct.pack('>i', result)
+        self.push(result)
+        logger.debug('EXEC: and&')
+        return 0
+
+
     def exec_call(self):
         target = self.mem.read(4)
         target, = struct.unpack('>I', target)
@@ -540,6 +564,50 @@ class Machine:
         result = struct.pack('>h', result)
         self.push(result)
         logger.debug('EXEC: neg%')
+        return 0
+
+
+    def exec_not_integer(self):
+        x = self.pop(2)
+        x, = struct.unpack('>h', x)
+        result = ~x
+        result = struct.pack('>h', result)
+        self.push(result)
+        logger.debug('EXEC: not%')
+        return 0
+
+
+    def exec_not_long(self):
+        x = self.pop(4)
+        x, = struct.unpack('>i', x)
+        result = ~x
+        result = struct.pack('>i', result)
+        self.push(result)
+        logger.debug('EXEC: not&')
+        return 0
+
+
+    def exec_or_integer(self):
+        y = self.pop(2)
+        x = self.pop(2)
+        y, = struct.unpack('>h', y)
+        x, = struct.unpack('>h', x)
+        result = x | y
+        result = struct.pack('>h', result)
+        self.push(result)
+        logger.debug('EXEC: or%')
+        return 0
+
+
+    def exec_or_long(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>i', y)
+        x, = struct.unpack('>i', x)
+        result = x | y
+        result = struct.pack('>i', result)
+        self.push(result)
+        logger.debug('EXEC: or&')
         return 0
 
 
@@ -885,6 +953,30 @@ class Machine:
         self.mem.write(value)
         logger.debug(f'EXEC: writei_n')
         return 2
+
+
+    def exec_xor_integer(self):
+        y = self.pop(2)
+        x = self.pop(2)
+        y, = struct.unpack('>h', y)
+        x, = struct.unpack('>h', x)
+        result = x ^ y
+        result = struct.pack('>h', result)
+        self.push(result)
+        logger.debug('EXEC: or%')
+        return 0
+
+
+    def exec_xor_long(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>i', y)
+        x, = struct.unpack('>i', x)
+        result = x ^ y
+        result = struct.pack('>i', result)
+        self.push(result)
+        logger.debug('EXEC: or&')
+        return 0
 
 
     def pop(self, size):

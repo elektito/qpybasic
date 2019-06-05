@@ -306,6 +306,14 @@ def_instr(0x5d, 'div%', stack=-2)
 def_instr(0x5e, 'div&', stack=-4)
 def_instr(0x5f, 'div!', stack=-4)
 def_instr(0x60, 'div#', stack=-8)
+def_instr(0x61, 'not%', stack=0)
+def_instr(0x62, 'not&', stack=0)
+def_instr(0x63, 'and%', stack=-2)
+def_instr(0x64, 'and&', stack=-4)
+def_instr(0x65, 'or%', stack=-2)
+def_instr(0x66, 'or&', stack=-4)
+def_instr(0x67, 'xor%', stack=-2)
+def_instr(0x68, 'xor&', stack=-4)
 
 # maximum instruction name length, calculated here for formatting
 # purposes.

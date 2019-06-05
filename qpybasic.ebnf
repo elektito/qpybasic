@@ -128,14 +128,33 @@ _print_sep: SEMICOLON
 
 return_stmt: RETURN_KW
 
+?expr: imp_expr
 
-?expr: addsub_expr
-     | expr "<" addsub_expr   -> expr_lt
-     | expr ">" addsub_expr   -> expr_gt
-     | expr "<=" addsub_expr  -> expr_le
-     | expr ">=" addsub_expr  -> expr_ge
-     | expr "=" addsub_expr   -> expr_eq
-     | expr "<>" addsub_expr   -> expr_ne
+?imp_expr: eqv_expr
+         | expr IMP_KW eqv_expr
+
+?eqv_expr: xor_expr
+         | eqv_expr EQV_KW xor_expr
+
+?xor_expr: or_expr
+         | xor_expr XOR_KW or_expr
+
+?or_expr: and_expr
+        | or_expr OR_KW and_expr
+
+?and_expr: not_expr
+         | and_expr AND_KW not_expr
+
+?not_expr: compare_expr
+         | NOT_KW compare_expr
+
+?compare_expr: addsub_expr
+             | compare_expr "<" addsub_expr   -> expr_lt
+             | compare_expr ">" addsub_expr   -> expr_gt
+             | compare_expr "<=" addsub_expr  -> expr_le
+             | compare_expr ">=" addsub_expr  -> expr_ge
+             | compare_expr "=" addsub_expr   -> expr_eq
+             | compare_expr "<>" addsub_expr   -> expr_ne
 
 ?addsub_expr: muldiv_expr
             | addsub_expr "+" muldiv_expr  -> expr_add
@@ -172,6 +191,7 @@ INT_LITERAL: /\d+/
 NUMERIC_LITERAL: /\d+(\.\d*)?[!#%&]?/
 STRING_LITERAL: /"[^"]*"/
 
+AND_KW: "and"i
 AS_KW: "as"i
 CALL_KW: "call"i
 CLS_KW: "cls"i
@@ -187,16 +207,20 @@ DOUBLE_KW: "double"i
 ELSE_KW: "else"i
 ELSEIF_KW: "elseif"i
 END_KW: "end"i
+EQV_KW: "eqv"i
 EXIT_KW: "exit"i
 FOR_KW: "for"i
 FUNCTION_KW: "function"i
 GOSUB_KW: "gosub"i
 GOTO_KW: "goto"i
 IF_KW: "if"i
+IMP_KW: "imp"i
 INTEGER_KW: "integer"i
 LET_KW: "let"i
 LONG_KW: "long"i
 NEXT_KW: "next"i
+NOT_KW: "not"i
+OR_KW: "or"i
 PRINT_KW: "print"i
 RETURN_KW: "return"i
 SINGLE_KW: "single"i
@@ -206,6 +230,7 @@ SUB_KW: "sub"i
 THEN_KW: "then"i
 TO_KW: "to"i
 TYPE_KW: "type"i
+XOR_KW: "xor"i
 
 COMMENT: /('|[rR][eE][mM][ \t\f]).*\n/
 %ignore COMMENT

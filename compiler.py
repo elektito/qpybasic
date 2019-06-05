@@ -653,6 +653,72 @@ class Expr:
         getattr(self, 'process_' + ast.data)(ast)
 
 
+    def process_not_expr(self, ast):
+        _, arg = ast.children
+        e = Expr(arg, self.parent)
+        if e.type.name == 'INTEGER':
+            self._instrs += e.instrs + [Instr('not%')]
+            self.type = e.type
+        elif e.type.name == 'LONG':
+            self._instrs += e.instrs + [Instr('not&')]
+            self.type = e.type
+        elif e.type.name in ['SINGLE', 'DOUBLE']:
+            self._instrs += e.instrs
+            self._instrs += [Instr(f'conv{e.type.typespec}&'),
+                             Instr('not&')]
+            e.type = Type('&')
+        else:
+            raise CompileError(EC.TYPE_MISMATCH)
+
+        self.is_const = e.is_const
+        if self.is_const:
+            self.const_value = ~e.const_value
+
+
+    def process_and_expr(self, ast):
+        left, _, right = ast.children
+        left = Expr(left, self.parent)
+        right = Expr(right, self.parent)
+        self.binary_logical_op('and', left, right)
+
+
+    def process_or_expr(self, ast):
+        left, _, right = ast.children
+        left = Expr(left, self.parent)
+        right = Expr(right, self.parent)
+        self.binary_logical_op('or', left, right)
+
+
+    def process_xor_expr(self, ast):
+        left, _, right = ast.children
+        left = Expr(left, self.parent)
+        right = Expr(right, self.parent)
+        self.binary_logical_op('xor', left, right)
+
+
+    def process_eqv_expr(self, ast):
+        left, _, right = ast.children
+        left = Expr(left, self.parent)
+        right = Expr(right, self.parent)
+        self.binary_logical_op('xor', left, right)
+        self._instrs += [Instr(f'not{self.type.typespec}')]
+
+
+    def process_eqv_expr(self, ast):
+        left, _, right = ast.children
+        left = Expr(left, self.parent)
+        right = Expr(right, self.parent)
+        self.binary_logical_op('xor', left, right)
+        self._instrs += [Instr(f'not{self.type.typespec}')]
+
+
+    def process_imp_expr(self, ast):
+        left, _, right = ast.children
+        left = Expr(left, self.parent)
+        right = Expr(right, self.parent)
+        self.binary_logical_op('or', left, right, inv_left=True)
+
+
     def process_expr_add(self, ast):
         left, right = ast.children
         left, right = Expr(left, self.parent), Expr(right, self.parent)
@@ -835,6 +901,11 @@ class Expr:
             'sub': l - r,
             'mul': l * r,
             'div': l / r,
+            'and': int(l) & int(r),
+            'or': int(l) | int(r),
+            'xor': int(l) ^ int(r),
+            'eqv': ~(int(l) ^ int(r)),
+            'imp': (~int(l)) | int(r),
         }[op]
 
         if all(v.type.typespec in ('%', '&') for v in (left, right)):
@@ -878,6 +949,48 @@ class Expr:
         instrs += [Instr(op + t)]
 
         self.type = Type(t)
+        self._instrs += instrs
+
+
+    def binary_logical_op(self, op, left, right, *,
+                          inv_left=False, inv_right=False):
+        self.is_const = left.is_const and right.is_const
+        if self.is_const:
+            self.calc_binary_const(op, left, right)
+
+        ltype, rtype = left.type, right.type
+        if any(not i.type.is_numeric for i in [left, right]):
+            raise CompileError(EC.TYPE_MISMATCH)
+
+        result_type = {
+            frozenset({'!'}): '&',
+            frozenset({'#'}): '&',
+            frozenset({'%'}): '%',
+            frozenset({'&'}): '&',
+            frozenset({'!', '#'}): '&',
+            frozenset({'!', '%'}): '&',
+            frozenset({'!', '&'}): '&',
+            frozenset({'#', '%'}): '&',
+            frozenset({'#', '&'}): '&',
+            frozenset({'%', '&'}): '&',
+        }[frozenset({ltype.typespec, rtype.typespec})]
+        result_type = Type(result_type)
+
+        instrs = left.instrs
+        if left.type != result_type:
+            instrs += gen_conv_instrs(left.type, result_type)
+        if inv_left:
+            instrs += [Instr(f'not{result_type.typespec}')]
+
+        instrs += right.instrs
+        if right.type != result_type:
+            instrs += gen_conv_instrs(right.type, result_type)
+        if inv_right:
+            instrs += [Instr(f'not{result_type.typespec}')]
+
+        instrs += [Instr(f'{op}{result_type.typespec}')]
+
+        self.type = result_type
         self._instrs += instrs
 
 
