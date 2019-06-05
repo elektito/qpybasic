@@ -38,7 +38,7 @@ def main():
 
     c = Compiler(optimization=args.optimize)
     if args.print_ast:
-        ast = c.parser.parse(source)
+        ast = c.parser.parse(source + '\n')
         print(ast.pretty())
         exit(0)
 
