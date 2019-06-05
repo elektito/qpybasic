@@ -9,6 +9,7 @@ from mmap import mmap
 from functools import reduce
 from enum import IntEnum, unique
 from compiler import Module
+from malloc import Allocator, InvalidPointer
 
 
 TRUE = struct.pack('>h', -1)
@@ -22,6 +23,8 @@ class ErrorCodes(IntEnum):
     INVALID_ARRAY_BOUNDS = 1
     INVALID_MEMSET_VALUE = 2
     SUBSCRIPT_OUT_OF_RANGE = 3
+    OUT_OF_MEMORY = 4
+    INVALID_POINTER = 5
 
 
     def __str__(self):
@@ -34,6 +37,12 @@ class ErrorCodes(IntEnum):
 
             self.SUBSCRIPT_OUT_OF_RANGE:
             'Subscript out of range',
+
+            self.OUT_OF_MEMORY:
+            'Out of memory',
+
+            self.INVALID_POINTER:
+            'Invalid pointer',
         }.get(int(self), super().__str__())
 
 
@@ -67,6 +76,10 @@ class Machine:
 
         self.check_stack_changes = True
         self.event_handler = self.event_handler_routine
+
+        HEAP_START = 0x40000000
+        HEAP_SIZE = 0x40000000
+        self.allocator = Allocator([(HEAP_START, HEAP_SIZE)])
 
 
     def event_handler_routine(self, event):
@@ -766,6 +779,10 @@ class Machine:
             self.syscall_memset()
         elif value == 0x07: # access_array
             self.syscall_access_array()
+        elif value == 0x08:
+            self.syscall_malloc()
+        elif value == 0x09:
+            self.syscall_free()
         else:
             logger.error('Invalid syscall number.')
         logger.debug('EXEC: syscall')
@@ -1024,6 +1041,23 @@ class Machine:
         addr = struct.pack('>I', addr)
 
         self.push(addr)
+
+
+    def syscall_malloc(self):
+        size, = struct.unpack('>I', self.pop(4))
+        try:
+            ptr = self.allocator.malloc(size)
+        except MemoryError:
+            raise MachineRuntimeError(RE.OUT_OF_MEMORY)
+        self.push(struct.pack('>I', ptr))
+
+
+    def syscall_free(self):
+        ptr, = struct.unpack('>I', self.pop(4))
+        try:
+            self.allocator.free(ptr)
+        except InvalidPointer as e:
+            raise MachineRuntimeError(RE.INVALID_POINTER, f'Invalid pointer: {e.ptr:x}')
 
 
     def error(self, msg):

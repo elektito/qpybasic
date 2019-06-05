@@ -282,13 +282,13 @@ class Type:
         'STRING'
     ]
 
-    def __init__(self, name, *, dimensions=None, elements=None):
+    def __init__(self, name, *, is_array=False, elements=None):
         if name in typespec_chars:
             self.name = typespec_to_typename[name]
         else:
             self.name = name.upper()
 
-        self.dimensions = dimensions
+        self.is_array = is_array
         self.elements = elements
 
         assert self.name in self.basic_types or self.elements
@@ -318,22 +318,12 @@ class Type:
             'SINGLE',
             'DOUBLE',
         ]
-        return self.name in numeric_types and self.dimensions == None
-
-    @property
-    def is_array(self):
-        return self.dimensions != None
+        return self.name in numeric_types and not self.is_array
 
 
     def get_size(self):
-        if self.dimensions:
-            array_size = 1
-            for d_from, d_to in self.dimensions:
-                array_size *= d_to - d_from + 1
-            hdr_size = 2 + 2*2*len(self.dimensions)
-        else:
-            array_size = 1
-            hdr_size = 0
+        if self.is_array:
+            return 4
 
         if self.is_basic:
             return {
@@ -342,11 +332,10 @@ class Type:
                 'SINGLE': 4,
                 'DOUBLE': 8,
                 'STRING': 4,
-            }[self.name] * array_size + hdr_size
+            }[self.name]
         else:
-            base_size = sum(e_type.get_size()
-                            for e_name, e_type in self.elements)
-            return array_size * base_size
+            return sum(e_type.get_size()
+                       for e_name, e_type in self.elements)
 
 
     def get_base_type_name(self):
@@ -358,15 +347,7 @@ class Type:
             name = f'User-Defined: {self.name}'
         else:
             name = self.name
-        if self.dimensions:
-            suffix = '('
-            for d_from, d_to in self.dimensions:
-                if suffix != '(':
-                    suffix += ', '
-                suffix += f'{d_from} TO {d_to}'
-            suffix += ')'
-        else:
-            suffix = ''
+        suffix = '()' if self.is_array else ''
         return f'<Type {name}{suffix}>'
 
 
@@ -387,6 +368,19 @@ class Var:
             return 4
         else:
             return self.type.get_size()
+
+
+    def gen_free_instructions(self):
+        if not self.on_heap:
+            return []
+
+        assert self.byref
+
+        instrs = []
+        instrs += Lvalue(self).gen_ref_instructions()
+        instrs += [Instr('syscall', '__free')]
+
+        return instrs
 
 
     def __eq__(self, other):
@@ -608,6 +602,14 @@ class Routine(VarContainer):
         self.type = type
         self.compiler = compiler
         self.instrs = []
+
+
+    def gen_free_instructions(self):
+        instrs = []
+        for v in self.vars:
+            if v.klass == 'local':
+                instrs += v.gen_free_instructions()
+        return instrs
 
 
     @property
@@ -1009,6 +1011,7 @@ class Compiler:
         ast = self.parser.parse(code)
         self.compile_ast(ast)
 
+        self.instrs += self.cur_routine.gen_free_instructions()
         self.instrs += [Instr('unframe', self.routines['__main']),
                         Instr('ret', 0)]
         self.instrs += sum((r.instrs for r in self.routines.values()), [])
@@ -1221,7 +1224,7 @@ class Compiler:
 
             if typename:
                 typename = typename.children[0].value
-                type = self.get_type(typename, dimensions=dimensions)
+                type = self.get_type(typename, is_array=bool(dimensions))
             else:
                 type = None
 
@@ -1354,8 +1357,9 @@ class Compiler:
         self.compile_ast(body)
 
         arg_size = sum(v.size for v in self.cur_routine.params)
-        self.instrs += [Label(self.cur_routine.exit_label),
-                        Instr('unframe', self.cur_routine),
+        self.instrs += [Label(self.cur_routine.exit_label)]
+        self.instrs += self.cur_routine.gen_free_instructions()
+        self.instrs += [Instr('unframe', self.cur_routine),
                         Instr('ret', arg_size)]
         self.cur_routine.instrs = self.instrs
 
@@ -1678,7 +1682,7 @@ class Compiler:
             if type:
                 raise CompileError(EC.INVALID_VAR_NAME)
 
-            type = Type(typespec, dimensions=dimensions)
+            type = Type(typespec, is_array=bool(dimensions))
         else:
             name = used_name
             typespec = None
@@ -1724,6 +1728,7 @@ class Compiler:
         var.no_type_dimmed = no_type
         var.klass = klass
         var.byref = byref
+        var.on_heap = False
 
         container.add_var(var)
 
@@ -1734,25 +1739,34 @@ class Compiler:
             lidx = var.container.local_vars.index(var)
             var.idx = -sum(v.size for v in var.container.local_vars[:lidx+1])
 
-        self.instrs += self.gen_init_var(var)
+        self.instrs += self.gen_init_var(var, dimensions)
 
         return var
 
 
-    def gen_init_var(self, var):
+    def gen_init_var(self, var, dimensions):
         instrs = []
         if var.klass == 'local':
             lv = Lvalue(var)
 
             if var.type.is_array:
+                size_in_bytes = sum(d_from * d_to
+                                    for d_from, d_to in dimensions)
+                instrs += [Instr('pushi_ul', size_in_bytes),
+                           Instr('syscall', '__malloc')]
+                instrs += lv.gen_write_instructions()
+
+                var.byref = True
+                var.on_heap = True
+
                 element_size = Type(var.type.get_base_type_name()).get_size()
-                instrs = []
-                for d_from, d_to in var.type.dimensions:
+                for d_from, d_to in dimensions:
                     instrs += [Instr('pushi%', d_to),
                                Instr('pushi%', d_from)]
-                instrs += [Instr('pushi%', len(var.type.dimensions)),
+                instrs += [Instr('pushi%', len(dimensions)),
                            Instr('pushi%', element_size)]
                 instrs += lv.gen_ref_instructions()
+
                 instrs += [Instr('syscall', '__init_array')]
             elif var.type.is_basic:
                 if var.type.name == 'STRING':
@@ -1788,16 +1802,16 @@ class Compiler:
         return var
 
 
-    def get_type(self, name, *, dimensions=None):
+    def get_type(self, name, *, is_array=False):
         name = name.upper()
         if name in Type.basic_types:
-            return Type(name, dimensions=dimensions)
+            return Type(name, is_array=is_array)
 
         elements = self.user_defined_types.get(name, None)
         if not elements:
             raise CompileError(EC.UNDEFINED_TYPE)
 
-        return Type(name, elements=elements, dimensions=dimensions)
+        return Type(name, elements=elements, is_array=is_array)
 
 
     def get_type_from_var_name(self, var_name):
@@ -1896,6 +1910,8 @@ class Assembler:
                     '__init_array': 0x05,
                     '__memset': 0x06,
                     '__access_array': 0x07,
+                    '__malloc': 0x08,
+                    '__free': 0x09,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:
