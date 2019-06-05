@@ -1711,12 +1711,11 @@ class Compiler:
                 else:
                     raise CompileError(EC.DUP_DEF)
 
-        if klass in ['local', 'param']:
-            container = self.cur_routine
-        elif klass == 'const':
-            container = self.const_container
-        else:
-            assert False, 'This should not happen!'
+        container = {
+            'local': self.cur_routine,
+            'param': self.cur_routine,
+            'const': self.const_container,
+        }[klass]
 
         var = Var()
         var.name = name
@@ -1735,34 +1734,39 @@ class Compiler:
             lidx = var.container.local_vars.index(var)
             var.idx = -sum(v.size for v in var.container.local_vars[:lidx+1])
 
-        if klass == 'local':
+        self.instrs += self.gen_init_var(var)
+
+        return var
+
+
+    def gen_init_var(self, var):
+        instrs = []
+        if var.klass == 'local':
             lv = Lvalue(var)
 
             if var.type.is_array:
                 element_size = Type(var.type.get_base_type_name()).get_size()
-                init_instrs = []
+                instrs = []
                 for d_from, d_to in var.type.dimensions:
-                    init_instrs += [Instr('pushi%', d_to),
-                                    Instr('pushi%', d_from)]
-                init_instrs += [Instr('pushi%', len(var.type.dimensions)),
-                                Instr('pushi%', element_size)]
-                init_instrs += lv.gen_ref_instructions()
-                init_instrs += [Instr('syscall', '__init_array')]
+                    instrs += [Instr('pushi%', d_to),
+                               Instr('pushi%', d_from)]
+                instrs += [Instr('pushi%', len(var.type.dimensions)),
+                           Instr('pushi%', element_size)]
+                instrs += lv.gen_ref_instructions()
+                instrs += [Instr('syscall', '__init_array')]
             elif var.type.is_basic:
                 if var.type.name == 'STRING':
-                    init_instrs = [Instr(f'pushi$', '""')]
+                    instrs = [Instr(f'pushi$', '""')]
                 else:
-                    init_instrs = [Instr(f'pushi{var.type.typespec}', 0)]
-                init_instrs += lv.gen_write_instructions()
+                    instrs = [Instr(f'pushi{var.type.typespec}', 0)]
+                instrs += lv.gen_write_instructions()
             else:
-                init_instrs = [Instr('pushi%', 0),
-                               Instr('pushi_ul', var.type.get_size())]
-                init_instrs += lv.gen_ref_instructions()
-                init_instrs += [Instr('syscall', '__memset')]
+                instrs = [Instr('pushi%', 0),
+                          Instr('pushi_ul', var.type.get_size())]
+                instrs += lv.gen_ref_instructions()
+                instrs += [Instr('syscall', '__memset')]
 
-            self.instrs += init_instrs
-
-        return var
+        return instrs
 
 
     def get_var(self, used_name):
