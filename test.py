@@ -621,6 +621,46 @@ x(4) = 1
     ]
 
 
+class TestArray8:
+    code = """
+n = 1
+m = 3
+p = 2
+dim x(n TO m, m TO m+p) as long
+
+x(1, 3) = 100
+x(3, 3) = 200
+x(3, 5) = 300
+
+print x(1, 3); x(3, 3); x(3, 5)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100  200  300 \n'),
+    ]
+
+
+class TestArray9:
+    code = """
+n& = 5
+dim x(n& * 2) as long
+
+for i% = 1 to n& * 2
+    x(i%) = i% * 10 + 1
+next
+
+for i% = 1 to n& * 2
+    print x(i%)
+next
+    """
+
+    cevents = []
+    vevents = [
+        ('print', f' {i * 10 + 1} \n') for i in range(1, 11)
+    ]
+
+
 class TestType1:
     code = """
 type foo

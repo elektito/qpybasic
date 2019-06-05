@@ -1238,19 +1238,24 @@ class Compiler:
 
         for d in ast.children:
             if len(d.children) == 1:
-                d_from = self.default_array_base
-                d_to = d.children[0]
+                d_from = self.get_constant_expr(self.default_array_base)
+                d_to = Expr(d.children[0], self)
             else:
                 d_from, _, d_to = d.children
-
-            d_from, d_to = int(d_from), int(d_to)
-
-            if d_to < d_from:
-                raise CompileError(EC.SUBSCRIPT_OUT_OF_RANGE)
+                d_from = Expr(d_from, self)
+                d_to = Expr(d_to, self)
 
             dimensions.append((d_from, d_to))
 
         return dimensions
+
+
+    def get_constant_expr(self, value):
+        if isinstance(value, (int, float)):
+            tree = Tree('value', [Token('NUMERIC_LITERAL', str(value))])
+        else:
+            tree = Tree('value', [Token('STRING_LITERAL', f'"{value}"')])
+        return Expr(tree, self)
 
 
     def process_end_stmt(self, ast):
@@ -1750,19 +1755,35 @@ class Compiler:
             lv = Lvalue(var)
 
             if var.type.is_array:
-                size_in_bytes = sum(d_from * d_to
-                                    for d_from, d_to in dimensions)
-                instrs += [Instr('pushi_ul', size_in_bytes),
+                instrs += [Instr('pushi_ul', 1)]
+                for d_from, d_to in dimensions:
+                    instrs += d_to.instrs
+                    if d_to.type.typespec != '%':
+                        instrs += [Instr(f'conv{d_to.type.typespec}%')]
+                    instrs += d_from.instrs
+                    if d_from.type.typespec != '%':
+                        instrs += [Instr(f'conv{d_from.type.typespec}%')]
+                    instrs += [Instr('sub%'),
+                               Instr('pushi%', 1),
+                               Instr('add%'),
+                               Instr('conv%_ul'),
+                               Instr('mul_ul')]
+                element_size = Type(var.type.get_base_type_name()).get_size()
+                instrs += [Instr('pushi_ul', element_size),
+                           Instr('mul_ul'),
                            Instr('syscall', '__malloc')]
                 instrs += lv.gen_write_instructions()
 
                 var.byref = True
                 var.on_heap = True
 
-                element_size = Type(var.type.get_base_type_name()).get_size()
                 for d_from, d_to in dimensions:
-                    instrs += [Instr('pushi%', d_to),
-                               Instr('pushi%', d_from)]
+                    instrs += d_to.instrs
+                    if d_to.type.typespec != '%':
+                        instrs += [Instr(f'conv{d_to.type.typespec}%')]
+                    instrs += d_from.instrs
+                    if d_from.type.typespec != '%':
+                        instrs += [Instr(f'conv{d_from.type.typespec}%')]
                 instrs += [Instr('pushi%', len(dimensions)),
                            Instr('pushi%', element_size)]
                 instrs += lv.gen_ref_instructions()

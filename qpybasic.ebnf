@@ -106,7 +106,7 @@ dim_stmt: DIM_KW ID dimensions [AS_KW typename]
 dimensions: "(" dimension ("," dimension)* ")"
           |
 
-dimension: NUMERIC_LITERAL [TO_KW NUMERIC_LITERAL]
+dimension: expr [TO_KW expr]
 
 end_stmt: END_CMD
 
