@@ -371,6 +371,18 @@ class Machine:
         return 0
 
 
+    def exec_conv_double_long(self):
+        value = self.pop(8)
+        value, = struct.unpack('>d', value)
+        value = int(value)
+        if value > 2**31-1 or value < -2**31:
+            value = -2**31
+        value = struct.pack('>i', value)
+        self.push(value)
+        logger.debug('EXEC: conv#&')
+        return 0
+
+
     def exec_div_long(self):
         y = self.pop(4)
         x = self.pop(4)
