@@ -63,7 +63,9 @@ sub_block: SUB_KW ID parameter_list _NEWLINE block_body END_KW SUB_KW
 parameter_list: "(" parameter_definition ("," parameter_definition)* ")"
               |
 
-parameter_definition: ID [AS_KW typename]
+parameter_definition: ID lpar_rpar [AS_KW typename]
+
+lpar_rpar: [LPAR RPAR]
 
 typename: INTEGER_KW
         | LONG_KW
@@ -153,7 +155,7 @@ value: NUMERIC_LITERAL
 
 lvalue: lv_base lv_suffix
 
-lv_base: ID ["(" argument_list ")"]
+lv_base: ID [LPAR argument_list RPAR]
 
 lv_suffix: ("." ID)*
 
@@ -163,6 +165,8 @@ _NEWLINE: "\n"
         | ":"
 SEMICOLON: ";"
 COMMA: ","
+LPAR: "("
+RPAR: ")"
 ID: /[a-z_][a-z0-9]*[!#%&$]?/i
 INT_LITERAL: /\d+/
 NUMERIC_LITERAL: /\d+(\.\d*)?[!#%&]?/

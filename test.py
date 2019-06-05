@@ -1244,6 +1244,106 @@ print x$; x&; x%
     ]
 
 
+class TestArrayPass1:
+    code = """
+sub foo(x() as integer, y)
+    print x(5)
+    x(5) = y
+end sub
+
+dim x(10) as integer
+x(5) = 10
+foo x(), 100
+print x(5)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10 \n'),
+        ('print', ' 100 \n'),
+    ]
+
+
+class TestArrayPass2:
+    code = """
+function foo(x() as integer, y)
+    print x(5)
+    x(5) = y
+end function
+
+dim x(10) as integer
+x(5) = 10
+ret = foo(x(), 100)
+print x(5)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10 \n'),
+        ('print', ' 100 \n'),
+    ]
+
+
+class TestArrayPass3:
+    code = """
+declare sub foo(x() as integer, y)
+
+dim x(10) as integer
+x(5) = 10
+foo x(), 100
+print x(5)
+
+sub foo(x() as integer, y)
+    print x(5)
+    x(5) = y
+end sub
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10 \n'),
+        ('print', ' 100 \n'),
+    ]
+
+
+class TestArrayPass4:
+    code = """
+declare function foo(x() as integer, y)
+
+dim x(10) as integer
+x(5) = 10
+ret = foo(x(), 100)
+print x(5)
+
+function foo(x() as integer, y)
+    print x(5)
+    x(5) = y
+end function
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10 \n'),
+        ('print', ' 100 \n'),
+    ]
+
+
+class TestArrayPass5:
+    code = """
+sub foo(x() as integer)
+    x(5) = y
+end sub
+
+dim x(10) as integer
+foo x
+    """
+
+    cevents = [
+        ('error', EC.TYPE_MISMATCH)
+    ]
+    vevents = []
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

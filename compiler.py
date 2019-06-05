@@ -134,6 +134,7 @@ class ErrorCodes(IntEnum):
     EXIT_FOR_INVALID = 39
     INVALID_CONSTANT = 40
     CANNOT_ASSIGN_TO_CONST = 41
+    INVALID_TYPE_ELEMENT = 42
 
 
     def __str__(self):
@@ -254,6 +255,9 @@ class ErrorCodes(IntEnum):
 
             self.CANNOT_ASSIGN_TO_CONST:
             'Cannot assign to const',
+
+            self.INVALID_TYPE_ELEMENT:
+            'Invalid type element.',
         }.get(int(self), super().__str__())
 
 
@@ -472,7 +476,7 @@ class Lvalue:
                 t = self.base.type.get_base_type_name()
                 element_size = self.compiler.get_type(t).get_size()
             else:
-                element_size = self.base.type.size
+                element_size = self.base.type.get_size()
             instrs += [Instr('pushi%', len(self.indices)),
                        Instr('pushi%', element_size)]
             instrs += addr_instrs
@@ -710,8 +714,8 @@ class Expr:
 
 
     def process_function_call(self, ast):
-        if len(ast.children) == 2:
-            fname, args = ast.children
+        if len(ast.children) == 4:
+            fname, _, args, _ = ast.children
             args = args.children
         else:
             fname, = ast.children
@@ -1061,7 +1065,8 @@ class Compiler:
         # we check whether it is in fact actually an ID.
         if isinstance(sub_name, Tree):
             base, suffix = sub_name.children
-            if len(suffix.children) > 0 or len(base.children) > 1:
+            if len(suffix.children) > 0 or \
+               len(base.children) > 1:
                 raise CompileError(EC.INVALID_SUB_NAME)
             sub_name = base.children[0].value
         else:
@@ -1154,15 +1159,18 @@ class Compiler:
 
         param_types = []
         for p in params.children:
-            if len(p.children) == 3:
+            if len(p.children) == 4:
                 # form: var AS type
-                pname, _, ptype = p.children
+                pname, lpar_rpar, _, ptype = p.children
                 pname = pname.value
-                ptype = Type(ptype.children[0].value)
+                ptype = Type(ptype.children[0].value,
+                             is_array=bool(lpar_rpar.children))
             else:
                 # form: var$
-                pname = p.children[0].value
+                pname, lpar_rpar = p.children
+                pname = pname.value
                 ptype = self.get_type_from_var_name(pname)
+                ptype.is_array = bool(lpar_rpar.children)
 
             param_types.append(ptype)
 
@@ -1373,14 +1381,16 @@ class Compiler:
 
 
     def parse_param_def(self, p):
-        if len(p.children) == 3:
+        if len(p.children) == 4:
             # form: var AS type
-            pname, _, ptype = p.children
+            pname, is_array, _, ptype = p.children
             pname = pname.value
-            ptype = self.get_type(ptype.children[0].value)
+            ptype = self.get_type(ptype.children[0].value,
+                                  is_array=bool(is_array.children))
         else:
             # form: var$
-            pname = p.children[0].value
+            pname, is_array = p.children
+            pname = pname.value
             ptype = None
 
         if any(pname == i.name for i in self.cur_routine.params):
@@ -1457,12 +1467,15 @@ class Compiler:
 
         elements = []
         for e in element_defs:
-            if len(e.children) == 1:
-                e_name, = e.children
+            if len(e.children) == 2:
+                e_name, is_array = e.children
                 e_type = self.get_default_type(e_name)
             else:
-                e_name, _, e_type = e.children
+                e_name, is_array, _, e_type = e.children
                 e_type = self.get_type(e_type.children[0])
+
+            if is_array.children:
+                raise CompileError(EC.INVALID_TYPE_ELEMENT)
 
             e_name = e_name.value
             elements.append((e_name, e_type))
@@ -1581,6 +1594,7 @@ class Compiler:
         # attempts to create an lvalue from it. if not possible, None
         # is returned.
 
+        empty_parentheses = False
         indices = None
         base, suffix = ast.children
 
@@ -1589,9 +1603,20 @@ class Compiler:
             return None
         else:
             var = self.get_var(base.children[0].value)
-            if len(base.children) == 2:
-                indices = [Expr(i, self) for i in base.children[1].children]
+            if len(base.children) == 4:
+                _, _, indices, _ = base.children
+                indices = [Expr(i, self) for i in indices.children]
+
+                if len(indices) == 0:
+                    # an array is being sent, like in 'sub_name arr(), arg2'
+                    if not var.type.is_array:
+                        raise CompileError(EC.TYPE_MISMATCH)
+                    empty_parentheses = True
             dots = [i.value for i in suffix.children]
+
+            if not indices and not dots and var.type.is_array and not empty_parentheses:
+                raise CompileError(EC.TYPE_MISMATCH)
+
             return Lvalue(var, indices=indices, dots=dots, compiler=self)
 
 
@@ -1754,7 +1779,7 @@ class Compiler:
         if var.klass == 'local':
             lv = Lvalue(var)
 
-            if var.type.is_array:
+            if var.type.is_array and dimensions:
                 instrs += [Instr('pushi_ul', 1)]
                 for d_from, d_to in dimensions:
                     instrs += d_to.instrs
