@@ -135,6 +135,7 @@ class ErrorCodes(IntEnum):
     INVALID_CONSTANT = 40
     CANNOT_ASSIGN_TO_CONST = 41
     INVALID_TYPE_ELEMENT = 42
+    INVALID_ARRAY_BOUNDS = 43
 
 
     def __str__(self):
@@ -258,6 +259,9 @@ class ErrorCodes(IntEnum):
 
             self.INVALID_TYPE_ELEMENT:
             'Invalid type element.',
+
+            self.INVALID_ARRAY_BOUNDS:
+            'Invalid array bounds',
         }.get(int(self), super().__str__())
 
 
@@ -327,7 +331,14 @@ class Type:
 
     def get_size(self):
         if self.is_array:
-            return 4
+            if self.dynamic:
+                return 4
+            else:
+                n = 1
+                for d_from, d_to in self.dims:
+                    n *= d_to - d_from + 1
+                hdr_size = 2 + 2 * 2 * len(self.dims)
+                return hdr_size + n * Type(self.get_base_type_name()).get_size()
 
         if self.is_basic:
             return {
@@ -1876,14 +1887,14 @@ class Compiler:
 
         container.add_var(var)
 
+        self.instrs += self.gen_init_var(var, dimensions)
+
         if var.klass == 'param':
             pidx = var.container.params.index(var)
             var.idx = 8 + sum(v.size for v in var.container.params[:pidx])
         elif var.klass == 'local':
             lidx = var.container.local_vars.index(var)
             var.idx = -sum(v.size for v in var.container.local_vars[:lidx+1])
-
-        self.instrs += self.gen_init_var(var, dimensions)
 
         return var
 
@@ -1894,40 +1905,15 @@ class Compiler:
             lv = Lvalue(var)
 
             if var.type.is_array and dimensions:
-                instrs += [Instr('pushi_ul', 1)]
                 for d_from, d_to in dimensions:
-                    instrs += d_to.instrs
-                    if d_to.type.typespec != '%':
-                        instrs += [Instr(f'conv{d_to.type.typespec}%')]
-                    instrs += d_from.instrs
-                    if d_from.type.typespec != '%':
-                        instrs += [Instr(f'conv{d_from.type.typespec}%')]
-                    instrs += [Instr('sub%'),
-                               Instr('pushi%', 1),
-                               Instr('add%'),
-                               Instr('conv%_ul'),
-                               Instr('mul_ul')]
-                element_size = Type(var.type.get_base_type_name()).get_size()
-                instrs += [Instr('pushi_ul', element_size),
-                           Instr('mul_ul'),
-                           Instr('syscall', '__malloc')]
-                instrs += lv.gen_write_instructions()
-
-                var.byref = True
-                var.on_heap = True
-
-                for d_from, d_to in dimensions:
-                    instrs += d_to.instrs
-                    if d_to.type.typespec != '%':
-                        instrs += [Instr(f'conv{d_to.type.typespec}%')]
-                    instrs += d_from.instrs
-                    if d_from.type.typespec != '%':
-                        instrs += [Instr(f'conv{d_from.type.typespec}%')]
-                instrs += [Instr('pushi%', len(dimensions)),
-                           Instr('pushi%', element_size)]
-                instrs += lv.gen_ref_instructions()
-
-                instrs += [Instr('syscall', '__init_array')]
+                    if not d_from.type.is_numeric or \
+                       not d_to.type.is_numeric:
+                        raise CompileError(EC.TYPE_MISMATCH)
+                if all(d_from.is_const and d_to.is_const
+                       for d_from, d_to in dimensions):
+                    instrs += self.gen_static_array_init(var, lv, dimensions)
+                else:
+                    instrs += self.gen_dynamic_array_init(var, lv, dimensions)
             elif var.type.is_basic:
                 if var.type.name == 'STRING':
                     instrs = [Instr(f'pushi$', '""')]
@@ -1939,6 +1925,73 @@ class Compiler:
                           Instr('pushi_ul', var.type.get_size())]
                 instrs += lv.gen_ref_instructions()
                 instrs += [Instr('syscall', '__memset')]
+
+        return instrs
+
+
+    def gen_static_array_init(self, var, lv, dimensions):
+        var.on_heap = False
+        var.type.dynamic = False
+        var.type.dims = []
+
+        instrs = []
+        for d_from, d_to in dimensions:
+            if d_from.const_value > d_to.const_value:
+                raise CompileError(EC.INVALID_ARRAY_BOUNDS)
+            var.type.dims.append((int(d_from.const_value), int(d_to.const_value)))
+            instrs += d_to.instrs
+            if d_to.type.typespec != '%':
+                instrs += [Instr(f'conv{d_to.type.typespec}%')]
+            instrs += d_from.instrs
+            if d_from.type.typespec != '%':
+                instrs += [Instr(f'conv{d_from.type.typespec}%')]
+        element_size = Type(var.type.get_base_type_name()).get_size()
+        instrs += [Instr('pushi%', len(dimensions)),
+                   Instr('pushi%', element_size)]
+        instrs += lv.gen_ref_instructions()
+
+        instrs += [Instr('syscall', '__init_array')]
+
+        return instrs
+
+
+    def gen_dynamic_array_init(self, var, lv, dimensions):
+        var.type.dynamic = True
+
+        instrs = [Instr('pushi_ul', 1)]
+        for d_from, d_to in dimensions:
+            instrs += d_to.instrs
+            if d_to.type.typespec != '%':
+                instrs += [Instr(f'conv{d_to.type.typespec}%')]
+            instrs += d_from.instrs
+            if d_from.type.typespec != '%':
+                instrs += [Instr(f'conv{d_from.type.typespec}%')]
+            instrs += [Instr('sub%'),
+                       Instr('pushi%', 1),
+                       Instr('add%'),
+                       Instr('conv%_ul'),
+                       Instr('mul_ul')]
+        element_size = Type(var.type.get_base_type_name()).get_size()
+        instrs += [Instr('pushi_ul', element_size),
+                   Instr('mul_ul'),
+                   Instr('syscall', '__malloc')]
+        instrs += lv.gen_write_instructions()
+
+        var.byref = True
+        var.on_heap = True
+
+        for d_from, d_to in dimensions:
+            instrs += d_to.instrs
+            if d_to.type.typespec != '%':
+                instrs += [Instr(f'conv{d_to.type.typespec}%')]
+            instrs += d_from.instrs
+            if d_from.type.typespec != '%':
+                instrs += [Instr(f'conv{d_from.type.typespec}%')]
+        instrs += [Instr('pushi%', len(dimensions)),
+                   Instr('pushi%', element_size)]
+        instrs += lv.gen_ref_instructions()
+
+        instrs += [Instr('syscall', '__init_array')]
 
         return instrs
 

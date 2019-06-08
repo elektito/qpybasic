@@ -661,6 +661,71 @@ next
     ]
 
 
+class TestArray10:
+    code = """
+n! = 5.0
+dim x(n! * 2) as long
+
+for i% = 1 to n! * 2
+    x(i%) = i% * 10 + 1
+next
+
+for i% = 1 to n! * 2
+    print x(i%)
+next
+    """
+
+    cevents = []
+    vevents = [
+        ('print', f' {i * 10 + 1} \n') for i in range(1, 11)
+    ]
+
+
+class TestArray11:
+    code = """
+dim x("foo") as long
+    """
+
+    cevents = [
+        ('error', EC.TYPE_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestArray12:
+    code = """
+n$ = "foo"
+dim x(n$) as long
+    """
+
+    cevents = [
+        ('error', EC.TYPE_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestArray13:
+    code = """
+dim x(0) as long
+    """
+
+    cevents = [
+        ('error', EC.INVALID_ARRAY_BOUNDS)
+    ]
+    vevents = []
+
+
+class TestArray14:
+    code = """
+dim x(1 to -1) as long
+    """
+
+    cevents = [
+        ('error', EC.INVALID_ARRAY_BOUNDS)
+    ]
+    vevents = []
+
+
 class TestType1:
     code = """
 type foo
