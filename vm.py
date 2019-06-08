@@ -383,6 +383,15 @@ class Machine:
         return 0
 
 
+    def exec_conv_double_single(self):
+        value = self.pop(8)
+        value, = struct.unpack('>d', value)
+        value = struct.pack('>f', value)
+        self.push(value)
+        logger.debug('EXEC: conv#!')
+        return 0
+
+
     def exec_div_long(self):
         y = self.pop(4)
         x = self.pop(4)
