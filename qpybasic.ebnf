@@ -1,18 +1,10 @@
 %ignore /[ \t\f]+/
 
-program: _nlopt _part_list
-
-_part_list: _part _part_list
-          |
+program: _nl? _part*
 
 _part: (_line | block | toplevel_block) _nl
 
-_nlopt: _nl
-      |
-
-_nl: _NEWLINE _nl
-   | _NEWLINE
-
+_nl: _NEWLINE+
 
 ?block: for_block
       | if_block
