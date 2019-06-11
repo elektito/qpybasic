@@ -1065,6 +1065,7 @@ class PostLex:
         prev_tok = None
         for tok in stream:
             if tok.type == 'COMMENT_QUOTE':
+                self.compiler.check_for_comment_directive(tok.value[1:])
                 continue
             if tok.value.lower() == 'end' and \
                (prev_tok == None or prev_tok.type == '_NEWLINE'):
@@ -1122,6 +1123,7 @@ class Compiler:
         self.default_types = {}
         self.exit_labels = []
         self.const_container = VarContainer(self)
+        self.default_allocation = 'static'
 
         self.add_string_literal('')
 
@@ -1784,8 +1786,7 @@ class Compiler:
 
 
     def process_rem_stmt(self, ast):
-        # A comment. Ignore.
-        pass
+        self.check_for_comment_directive(ast.children[0].value[4:])
 
 
     def process_return_stmt(self, ast):
@@ -1916,7 +1917,8 @@ class Compiler:
                     if not d_from.type.is_numeric or \
                        not d_to.type.is_numeric:
                         raise CompileError(EC.TYPE_MISMATCH)
-                if all(d_from.is_const and d_to.is_const
+                if self.default_allocation != 'dynamic' and \
+                   all(d_from.is_const and d_to.is_const
                        for d_from, d_to in dimensions):
                     instrs += self.gen_static_array_init(var, lv, dimensions)
                 else:
@@ -2044,6 +2046,14 @@ class Compiler:
     def get_default_type(self, var_name):
         t = self.default_types.get(var_name[0], None)
         return t if t else Type('SINGLE')
+
+
+    def check_for_comment_directive(self, comment):
+        comment = comment.strip().lower()
+        if comment == '$dynamic':
+            self.default_allocation = 'dynamic'
+        elif comment == '$static':
+            self.default_allocation = 'static'
 
 
 class Instr:
