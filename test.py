@@ -1434,6 +1434,83 @@ print 100 xor 22.29
     ]
 
 
+class TestComments1:
+    code = """
+'print 10
+REM print 20
+REM xyz123;foobar:print&xz!!@'foo
+    """
+
+    cevents = []
+    vevents = []
+
+
+class TestComments2:
+    code = """
+type foo
+    x as integer   ' defines the x field
+    y as long      ' defines the y field
+end type
+
+dim a as foo
+a.x = 100
+a.y = 200
+print a.x; a.y
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100  200 \n'),
+    ]
+
+
+class TestComments3:
+    code = """
+if 2 > 1 then   ' condition
+    print "2>1" ' if part
+else            ' else line
+    print "2<1" ' else part
+end if          ' end of if block!
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '2>1\n'),
+    ]
+
+
+class TestComments4:
+    code = """
+sub foo(x as long)   ' begin sub
+    print x          ' print arg
+end sub              ' end the sub
+
+REM call the sub
+foo 100
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n'),
+    ]
+
+
+class TestComments5:
+    code = """
+function foo&(x as long)   ' begin function
+    foo& = x + 100         ' set return value
+end function               ' end the function
+
+REM call the function
+print foo&(100)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 200 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
