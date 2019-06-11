@@ -1781,6 +1781,11 @@ class Compiler:
                        [Instr('syscall', '__print')]
 
 
+    def process_rem_stmt(self, ast):
+        # A comment. Ignore.
+        pass
+
+
     def process_return_stmt(self, ast):
         self.instrs += [Instr('ret', 0)]
 

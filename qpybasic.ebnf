@@ -34,6 +34,7 @@ lineno: NUMERIC_LITERAL
      | goto_stmt
      | let_stmt
      | print_stmt
+     | rem_stmt
      | return_stmt
 
 for_block: _for_stmt block_body next_stmt
@@ -117,6 +118,8 @@ print_stmt: PRINT_KW (expr _print_sep)* expr
 
 _print_sep: SEMICOLON
           | COMMA
+
+rem_stmt: COMMENT_REM
 
 return_stmt: RETURN_KW
 
@@ -224,10 +227,9 @@ TO_KW: "to"i
 TYPE_KW: "type"i
 XOR_KW: "xor"i
 
-COMMENT: /'[^\n]*/
-%ignore COMMENT
+COMMENT_QUOTE: /'[^\n]*/
+%ignore COMMENT_QUOTE
 
-COMMENT2: /(^|\n[ \t\f]*)rem /i /[^\n]/i*
-%ignore COMMENT2
+COMMENT_REM: /rem /i /[^\n]/i*
 
 %declare END_CMD

@@ -1511,6 +1511,19 @@ print foo&(100)
     ]
 
 
+class TestComments6:
+    code = """
+print 10   ' prints 10
+print 20: rem print 30 : print 40
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10 \n'),
+        ('print', ' 20 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
