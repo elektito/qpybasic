@@ -1851,6 +1851,8 @@ class Compiler:
             typespec = None
             if not type:
                 type = self.get_default_type(used_name)
+                type.is_array = bool(dimensions)
+
 
         containers = [self.cur_routine, self.const_container]
         for c in containers:
