@@ -1064,6 +1064,8 @@ class PostLex:
     def process(self, stream):
         prev_tok = None
         for tok in stream:
+            if tok.type == 'COMMENT_QUOTE':
+                continue
             if tok.value.lower() == 'end' and \
                (prev_tok == None or prev_tok.type == '_NEWLINE'):
                 try:

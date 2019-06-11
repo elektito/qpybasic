@@ -75,7 +75,7 @@ _block_body_item: block _NEWLINE
                 | _line _NEWLINE
                 | _NEWLINE
 
-type_block: TYPE_KW ID _nl (parameter_definition _nl)* END_KW TYPE_KW
+type_block: TYPE_KW ID _nl (parameter_definition COMMENT_QUOTE? _nl)* END_KW TYPE_KW
 
 call_stmt: lvalue argument_list
          | CALL_KW ID ["(" argument_list ")"]
@@ -228,8 +228,6 @@ TYPE_KW: "type"i
 XOR_KW: "xor"i
 
 COMMENT_QUOTE: /'[^\n]*/
-%ignore COMMENT_QUOTE
-
 COMMENT_REM: /rem /i /[^\n]/i*
 
 %declare END_CMD
