@@ -2,6 +2,7 @@ import struct
 import asm
 from collections import OrderedDict
 from enum import IntEnum, unique
+from copy import deepcopy
 from lark import Lark, Token, Tree
 from module import Module
 
@@ -2047,7 +2048,8 @@ class Compiler:
 
     def get_default_type(self, var_name):
         t = self.default_types.get(var_name[0], None)
-        return t if t else Type('SINGLE')
+        t = t if t else Type('SINGLE')
+        return deepcopy(t)
 
 
     def check_for_comment_directive(self, comment):

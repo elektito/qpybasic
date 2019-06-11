@@ -726,6 +726,17 @@ dim x(1 to -1) as long
     vevents = []
 
 
+class TestArray15:
+    code = """
+defint a-z
+dim x(10)
+x(1) = 100 + i
+    """
+
+    cevents = []
+    vevents = []
+
+
 class TestType1:
     code = """
 type foo
