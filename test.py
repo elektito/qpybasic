@@ -737,6 +737,23 @@ x(1) = 100 + i
     vevents = []
 
 
+class TestArray16:
+    code = """
+dim x(2) as integer, y(3) as integer
+x(1) = 10
+x(2) = 20
+y(1) = 11
+y(2) = 22
+y(3) = 33
+
+print x(1); x(2); y(1); y(2); y(3)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10  20  11  22  33 \n'),
+    ]
+
 class TestType1:
     code = """
 type foo
@@ -1320,6 +1337,20 @@ print x$; x&; x%
     ]
 
 
+class TestVars11:
+    code = """
+dim x as string, y as string
+x = "foo"
+y = "bar"
+print x; y
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foobar\n')
+    ]
+
+
 class TestArrayPass1:
     code = """
 sub foo(x() as integer, y)
@@ -1562,6 +1593,39 @@ declare sub foo
 
 dim shared a(5) as integer
 dim shared x as long
+
+x = 100
+foo
+
+for i = 1 to 5
+    print a(i)
+next
+
+sub foo
+    print x
+
+    for i = 1 to 5
+        a(i) = i * 10
+    next
+end sub
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n'),
+        ('print', ' 10 \n'),
+        ('print', ' 20 \n'),
+        ('print', ' 30 \n'),
+        ('print', ' 40 \n'),
+        ('print', ' 50 \n'),
+    ]
+
+
+class TestShared3:
+    code = """
+declare sub foo
+
+dim shared a(5) as integer, x as long
 
 x = 100
 foo

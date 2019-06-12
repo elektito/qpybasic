@@ -96,9 +96,11 @@ deftype_stmt: (DEFINT_KW | DEFLNG_KW | DEFSNG_KW | DEFDBL_KW | DEFSTR_KW) letter
 // compiler.
 letter_range: ID ["-" ID]
 
-dim_stmt: DIM_KW shared_opt ID dimensions [AS_KW typename]
+dim_stmt: DIM_KW shared_opt var_decl ("," var_decl)*
 
 shared_opt: SHARED_KW?
+
+var_decl: ID dimensions [AS_KW typename]
 
 dimensions: "(" dimension ("," dimension)* ")"
           |

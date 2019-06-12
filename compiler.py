@@ -1398,19 +1398,23 @@ class Compiler:
 
 
     def process_dim_stmt(self, ast):
-        if len(ast.children) == 3:
-            _, is_shared, name = ast.children
-            if is_shared.children:
-                klass = 'shared'
-            else:
-                klass = 'local'
+        _, is_shared, *decls = ast.children
+        is_shared = bool(is_shared.children)
+        for d in decls:
+            self.process_dim_clause(d, is_shared)
+
+
+    def process_dim_clause(self, clause, is_shared):
+        klass = 'shared' if is_shared else 'local'
+        if len(clause.children) == 1:
+            name, = clause.children
             self.dim_var(name, klass=klass)
         else:
-            if len(ast.children) == 4:
-                _, is_shared, name, dimensions = ast.children
+            if len(clause.children) == 2:
+                name, dimensions = clause.children
                 typename = None
             else:
-                _, is_shared, name, dimensions,  _, typename = ast.children
+                name, dimensions,  _, typename = clause.children
 
             if dimensions.children:
                 dimensions = self.parse_dimensions(dimensions)
@@ -1422,11 +1426,6 @@ class Compiler:
                 type = self.get_type(typename, is_array=bool(dimensions))
             else:
                 type = None
-
-            if is_shared.children:
-                klass = 'shared'
-            else:
-                klass = 'local'
 
             self.dim_var(name,
                          type=type,
