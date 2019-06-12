@@ -1654,6 +1654,155 @@ end sub
     ]
 
 
+class TestDoLoop1:
+    code = """
+defint x
+do while x < 5
+    print x
+    x = x + 1
+loop
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+        ('print', ' 1 \n'),
+        ('print', ' 2 \n'),
+        ('print', ' 3 \n'),
+        ('print', ' 4 \n'),
+    ]
+
+
+class TestDoLoop2:
+    code = """
+defint x
+do while x > 5
+    print x
+    x = x + 1
+loop
+    """
+
+    cevents = []
+    vevents = []
+
+
+class TestDoLoop3:
+    code = """
+defint x
+do until x = 5
+    print x
+    x = x + 1
+loop
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+        ('print', ' 1 \n'),
+        ('print', ' 2 \n'),
+        ('print', ' 3 \n'),
+        ('print', ' 4 \n'),
+    ]
+
+
+class TestDoLoop4:
+    code = """
+defint x
+do until x = 0
+    print x
+    x = x + 1
+loop
+    """
+
+    cevents = []
+    vevents = []
+
+
+class TestDoLoop5:
+    code = """
+defint x
+do
+    print x
+    x = x + 1
+loop while x < 5
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+        ('print', ' 1 \n'),
+        ('print', ' 2 \n'),
+        ('print', ' 3 \n'),
+        ('print', ' 4 \n'),
+    ]
+
+
+class TestDoLoop6:
+    code = """
+defint x
+do
+    print x
+    x = x + 1
+loop while x = 5
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+    ]
+
+
+class TestDoLoop7:
+    code = """
+defint x
+do
+    print x
+    x = x + 1
+loop until x = 5
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+        ('print', ' 1 \n'),
+        ('print', ' 2 \n'),
+        ('print', ' 3 \n'),
+        ('print', ' 4 \n'),
+    ]
+
+
+class TestDoLoop8:
+    code = """
+defint x
+do
+    print x
+    x = x + 1
+loop until x < 5
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+    ]
+
+
+class TestDoLoop9:
+    code = """
+defint x
+do
+    do
+        print x
+        x = x + 1
+    loop until x < 5
+loop until -1
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

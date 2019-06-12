@@ -1736,6 +1736,55 @@ class Compiler:
         self.compile_ast(body)
 
 
+    def process_do_loop_forever(self, ast):
+        _, body, _ = ast.children
+        self.process_do_loop_block(body)
+
+
+    def process_do_loop_cond_top(self, ast):
+        _, cond_type, cond, body, _ = ast.children
+        self.process_do_loop_block(body,
+                                   cond=cond,
+                                   cond_type=cond_type.value.lower(),
+                                   cond_loc='top')
+
+
+    def process_do_loop_cond_bottom(self, ast):
+        _, body, _, cond_type, cond = ast.children
+        self.process_do_loop_block(body,
+                                   cond=cond,
+                                   cond_type=cond_type.value.lower(),
+                                   cond_loc='bottom')
+
+
+    def process_do_loop_block(self, body, *,
+                              cond=None, cond_type=None, cond_loc=None):
+        top_label = self.gen_label('loop_top')
+        bottom_label = self.gen_label('loop_bottom')
+
+        if cond:
+            cond = Expr(cond, self)
+
+        self.instrs += [Label(top_label)]
+        if cond and cond_loc == 'top':
+            self.instrs += cond.instrs
+            if cond_type == 'until':
+                self.instrs += [Instr('not%')]
+            self.instrs += [Instr('jmpf', bottom_label)]
+
+        self.compile_ast(body)
+
+        if cond and cond_loc == 'bottom':
+            self.instrs += cond.instrs
+            if cond_type == 'until':
+                self.instrs += [Instr('not%')]
+            self.instrs += [Instr('jmpt', top_label)]
+        else:
+            self.instrs += [Instr('jmp', top_label)]
+
+        self.instrs += [Label(bottom_label)]
+
+
     def process_let_stmt(self, ast):
         if len(ast.children) == 3:
             # cut the LET keyword

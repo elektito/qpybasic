@@ -7,6 +7,7 @@ _part: (_line | block | toplevel_block) _nl
 _nl: _NEWLINE+
 
 ?block: for_block
+      | do_block
       | if_block
 
 ?toplevel_block: sub_block
@@ -50,6 +51,10 @@ if_block: IF_KW expr THEN_KW _NEWLINE block_body else_list END_KW IF_KW
 else_list: ELSEIF_KW expr THEN_KW _NEWLINE block_body else_list  -> elseif_sub_block
          | ELSE_KW _NEWLINE block_body                           -> else_sub_block
          |
+
+do_block: DO_KW _nl block_body LOOP_KW                              -> do_loop_forever
+        | DO_KW (WHILE_KW | UNTIL_KW) expr _nl block_body LOOP_KW   -> do_loop_cond_top
+        | DO_KW _nl block_body LOOP_KW (WHILE_KW | UNTIL_KW) expr   -> do_loop_cond_bottom
 
 sub_block: SUB_KW ID parameter_list _NEWLINE block_body END_KW SUB_KW
 
@@ -202,6 +207,7 @@ DEFLNG_KW: "deflng"i
 DEFSNG_KW: "defsng"i
 DEFSTR_KW: "defstr"i
 DIM_KW: "dim"i
+DO_KW: "do"i
 DOUBLE_KW: "double"i
 ELSE_KW: "else"i
 ELSEIF_KW: "elseif"i
@@ -217,6 +223,7 @@ IMP_KW: "imp"i
 INTEGER_KW: "integer"i
 LET_KW: "let"i
 LONG_KW: "long"i
+LOOP_KW: "loop"i
 NEXT_KW: "next"i
 NOT_KW: "not"i
 OR_KW: "or"i
@@ -230,6 +237,8 @@ SUB_KW: "sub"i
 THEN_KW: "then"i
 TO_KW: "to"i
 TYPE_KW: "type"i
+UNTIL_KW: "until"i
+WHILE_KW: "while"i
 XOR_KW: "xor"i
 
 COMMENT_QUOTE: /'[^\n]*/
