@@ -468,6 +468,9 @@ class Lvalue:
 
 
     def process_base_addr(self):
+        # returns instructions to add the address of the base variable
+        # on the stack.
+
         instrs = []
 
         if self.base.byref:
@@ -500,6 +503,10 @@ class Lvalue:
 
 
     def process_param_or_local(self, iname, ref):
+        # returns instructions to put the value of the base variable
+        # (or its address, when ref=True) on the stack, when base
+        # variable is a local variable or a parameter.
+
         size = self.type.get_size()
         if self.base.byref:
             instrs = [Instr('readf4', self.base)]
@@ -518,6 +525,9 @@ class Lvalue:
 
 
     def process_const(self):
+        # returns the instructions to put the value of the base, when
+        # it is a constant.
+
         if self.base.type.is_numeric:
             instrs = [Instr(f'pushi{self.base.type.typespec}', self.base.const_value)]
         else:
