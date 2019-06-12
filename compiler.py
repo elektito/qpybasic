@@ -358,6 +358,16 @@ class Type:
         return self.name
 
 
+    def get_base_size(self):
+        # if this is an array, return the size of its base type,
+        # otherwise return its size.
+
+        if self.is_array:
+            return Type(var.type.get_base_type_name()).get_size()
+        else:
+            return self.get_size()
+
+
     def __repr__(self):
         if self.typespec == '':
             name = f'User-Defined: {self.name}'
@@ -473,10 +483,13 @@ class Lvalue:
 
         instrs = []
 
-        if self.base.byref:
-            addr_instrs = [Instr('readf4', self.base)]
+        if self.base.klass in ['param', 'local']:
+            if self.base.byref:
+                addr_instrs = [Instr('readf4', self.base)]
+            else:
+                addr_instrs = [Instr('pushfp', self.base)]
         else:
-            addr_instrs = [Instr('pushfp', self.base)]
+            addr_instrs = [Instr('pushi_ul', self.base)]
 
         if self.indices:
             for i in reversed(self.indices):
@@ -536,6 +549,18 @@ class Lvalue:
         return instrs
 
 
+    def process_shared(self, iname, ref):
+        # returns instructions to put the value of the base variable
+        # (or its address, when ref=True) on the stack when the base
+        # variable is shared.
+
+        instrs = [Instr('pushi_ul', self.base)]
+        if not ref:
+            instrs += [Instr(f'{iname}i{self.base.type.get_base_size()}')]
+
+        return instrs
+
+
     def gen_instructions(self, iname, *, ref=False):
         # iname is either 'read' or 'write'.
         #
@@ -548,6 +573,8 @@ class Lvalue:
         if not self.indices and not self.dots:
             if self.base.klass in ['param', 'local']:
                 instrs = self.process_param_or_local(iname, ref)
+            elif self.base.klass == 'shared':
+                instrs = self.process_shared(iname, ref)
             elif self.base.klass == 'const':
                 if iname != 'read':
                     raise CompileError(EC.CANNOT_ASSIGN_TO_CONST)
@@ -618,6 +645,19 @@ class VarContainer:
                 return v
 
         return None
+
+
+class SharedVarContainer(VarContainer):
+    def get_var_offset(self, var):
+        offset = 0
+        for v in self.vars:
+            if v == var:
+                break
+            offset += v.type.get_size()
+        else:
+            assert False
+
+        return offset
 
 
 class Routine(VarContainer):
@@ -1134,6 +1174,7 @@ class Compiler:
         self.default_types = {}
         self.exit_labels = []
         self.const_container = VarContainer(self)
+        self.shared_container = SharedVarContainer(self)
         self.default_allocation = 'static'
 
         self.add_string_literal('')
@@ -1162,7 +1203,9 @@ class Compiler:
 
         assembler = Assembler(self)
         self.bytecode = assembler.assemble(self.instrs)
-        return Module.create(self.bytecode, self.string_literals)
+        return Module.create(self.bytecode,
+                             self.string_literals,
+                             self.shared_container.vars)
 
 
     def compile_ast(self, ast):
@@ -1355,15 +1398,19 @@ class Compiler:
 
 
     def process_dim_stmt(self, ast):
-        if len(ast.children) == 2:
-            _, name = ast.children
-            self.dim_var(name)
+        if len(ast.children) == 3:
+            _, is_shared, name = ast.children
+            if is_shared.children:
+                klass = 'shared'
+            else:
+                klass = 'local'
+            self.dim_var(name, klass=klass)
         else:
-            if len(ast.children) == 3:
-                _, name, dimensions = ast.children
+            if len(ast.children) == 4:
+                _, is_shared, name, dimensions = ast.children
                 typename = None
             else:
-                _, name, dimensions,  _, typename = ast.children
+                _, is_shared, name, dimensions,  _, typename = ast.children
 
             if dimensions.children:
                 dimensions = self.parse_dimensions(dimensions)
@@ -1376,8 +1423,14 @@ class Compiler:
             else:
                 type = None
 
+            if is_shared.children:
+                klass = 'shared'
+            else:
+                klass = 'local'
+
             self.dim_var(name,
                          type=type,
+                         klass=klass,
                          dimensions=dimensions)
 
 
@@ -1844,7 +1897,7 @@ class Compiler:
 
     def dim_var(self, used_name, *,
                 klass='local', byref=False, type=None, dimensions=None):
-        assert klass in ['local', 'param', 'const']
+        assert klass in ['local', 'param', 'const', 'shared']
         assert klass == 'param' or not byref
 
         no_type = (type == None)
@@ -1865,7 +1918,9 @@ class Compiler:
                 type.is_array = bool(dimensions)
 
 
-        containers = [self.cur_routine, self.const_container]
+        containers = [self.cur_routine,
+                      self.const_container,
+                      self.shared_container]
         for c in containers:
             var = c.lookup_var(name, typespec)
             if var:
@@ -1895,6 +1950,7 @@ class Compiler:
             'local': self.cur_routine,
             'param': self.cur_routine,
             'const': self.const_container,
+            'shared': self.shared_container,
         }[klass]
 
         var = Var()
@@ -1922,7 +1978,7 @@ class Compiler:
 
     def gen_init_var(self, var, dimensions):
         instrs = []
-        if var.klass == 'local':
+        if var.klass in ['local', 'shared']:
             lv = Lvalue(var)
 
             if var.type.is_array and dimensions:
@@ -2026,7 +2082,9 @@ class Compiler:
             name = used_name
             typespec = None
 
-        containers = [self.cur_routine, self.const_container]
+        containers = [self.cur_routine,
+                      self.const_container,
+                      self.shared_container]
         for c in containers:
             var = c.lookup_var(name, typespec)
             if var:
@@ -2146,6 +2204,11 @@ class Assembler:
             elif instr.name == 'pushi$':
                 s = instr.operands[0][1:-1]
                 operands = [Module.STRING_ADDR + self.compiler.string_literals[s]]
+            elif instr.name == 'pushi_ul':
+                val = instr.operands[0]
+                if isinstance(val, Var) and val.klass == 'shared':
+                    val = Module.SHARED_ADDR + self.compiler.shared_container.get_var_offset(val)
+                operands = [val]
             elif instr.name == 'syscall':
                 call_code = {
                     '__cls': 0x02,

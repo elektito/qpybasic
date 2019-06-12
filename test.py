@@ -1535,6 +1535,61 @@ print 20: rem print 30 : print 40
     ]
 
 
+class TestShared1:
+    code = """
+declare sub foo
+
+dim shared a(100) as integer
+dim shared x as long
+
+x = 100
+foo
+
+sub foo
+    print x
+end sub
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n'),
+    ]
+
+
+class TestShared2:
+    code = """
+declare sub foo
+
+dim shared a(5) as integer
+dim shared x as long
+
+x = 100
+foo
+
+for i = 1 to 5
+    print a(i)
+next
+
+sub foo
+    print x
+
+    for i = 1 to 5
+        a(i) = i * 10
+    next
+end sub
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n'),
+        ('print', ' 10 \n'),
+        ('print', ' 20 \n'),
+        ('print', ' 30 \n'),
+        ('print', ' 40 \n'),
+        ('print', ' 50 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
