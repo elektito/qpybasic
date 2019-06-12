@@ -114,7 +114,7 @@ dimension: expr [TO_KW expr]
 
 end_stmt: END_CMD
 
-exit_stmt: EXIT_KW (SUB_KW | FUNCTION_KW | FOR_KW)
+exit_stmt: EXIT_KW (SUB_KW | FUNCTION_KW | FOR_KW | DO_KW)
 
 gosub_stmt: GOSUB_KW (ID | NUMERIC_LITERAL)
 

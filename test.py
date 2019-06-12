@@ -1803,6 +1803,66 @@ loop until -1
     ]
 
 
+class TestDoLoop10:
+    code = """
+defint x
+do
+    print "foo"
+    exit do
+    print "bar"
+loop
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
+class TestDoLoop11:
+    code = """
+exit do
+    """
+
+    cevents = [
+        ('error', EC.EXIT_DO_INVALID)
+    ]
+    vevents = []
+
+
+class TestDoLoop12:
+    code = """
+for i = 1 to 10
+    exit do
+next
+    """
+
+    cevents = [
+        ('error', EC.EXIT_DO_INVALID)
+    ]
+    vevents = []
+
+
+class TestDoLoop13:
+    code = """
+defint x
+do
+    do
+        print "foo"
+        exit do
+        print "bar"
+    loop
+    print "spam"
+loop until x = 0
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+        ('print', 'spam\n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

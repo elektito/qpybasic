@@ -137,6 +137,7 @@ class ErrorCodes(IntEnum):
     CANNOT_ASSIGN_TO_CONST = 41
     INVALID_TYPE_ELEMENT = 42
     INVALID_ARRAY_BOUNDS = 43
+    EXIT_DO_INVALID = 44
 
 
     def __str__(self):
@@ -263,6 +264,9 @@ class ErrorCodes(IntEnum):
 
             self.INVALID_ARRAY_BOUNDS:
             'Invalid array bounds',
+
+            self.EXIT_DO_INVALID:
+            'EXIT not within DO...LOOP',
         }.get(int(self), super().__str__())
 
 
@@ -1483,6 +1487,15 @@ class Compiler:
                 raise CompileError(EC.EXIT_FOR_INVALID)
 
             self.instrs += [Instr('jmp', label)]
+        elif target == 'do':
+            if self.exit_labels == []:
+                raise CompileError(EC.EXIT_DO_INVALID)
+
+            type, label = self.exit_labels[-1]
+            if type != 'do':
+                raise CompileError(EC.EXIT_DO_INVALID)
+
+            self.instrs += [Instr('jmp', label)]
         else:
             assert False
 
@@ -1761,6 +1774,7 @@ class Compiler:
                               cond=None, cond_type=None, cond_loc=None):
         top_label = self.gen_label('loop_top')
         bottom_label = self.gen_label('loop_bottom')
+        self.exit_labels.append(('do', bottom_label))
 
         if cond:
             cond = Expr(cond, self)
@@ -1783,6 +1797,7 @@ class Compiler:
             self.instrs += [Instr('jmp', top_label)]
 
         self.instrs += [Label(bottom_label)]
+        self.exit_labels.pop()
 
 
     def process_let_stmt(self, ast):
