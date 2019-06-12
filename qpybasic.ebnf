@@ -16,8 +16,8 @@ _nl: _NEWLINE+
 
 _line: [label | lineno] _stmt_group
 
-_stmt_group: (stmt ":") _stmt_group
-           | stmt?
+_stmt_group: stmt (":" stmt)*
+           |
 
 label: ID ":"
 
