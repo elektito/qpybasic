@@ -192,7 +192,7 @@ LPAR: "("
 RPAR: ")"
 ID: /[a-z_][a-z0-9]*[!#%&$]?/i
 INT_LITERAL: /\d+/
-NUMERIC_LITERAL: /\d+(\.\d*)?[!#%&]?/
+NUMERIC_LITERAL: /\d+(\.\d*)?[!#%&]?/i | /&h[\da-f]+/i
 STRING_LITERAL: /"[^"]*"/
 
 AND_KW: "and"i

@@ -63,7 +63,7 @@ def get_literal_type(literal):
         if '.' in literal: # single or double
             return Type('#') # for now, consider all float literals as double
         else: # integer or long
-            v = int(literal)
+            v = parse_int_literal(literal)
             if -32768 <= v < 32768:
                 return Type('%')
             elif -2**31 <= v < 2**31:
@@ -87,6 +87,14 @@ def builtin_func_abs(parent, args):
                Instr(f'neg{e.type.typespec}'),
                Label(end_label)]
     return e.type, e.instrs
+
+
+def parse_int_literal(value):
+    value = value.lower()
+    if value.startswith('&h'):
+        return int(value[2:], base=16)
+    else:
+        return int(value)
 
 
 builtin_functions = {
@@ -938,7 +946,7 @@ class Expr:
         elif v.type == 'NUMERIC_LITERAL':
             t = get_literal_type(v.value)
             if t.name.lower() in ['integer', 'long']:
-                value = int(v.value)
+                value = parse_int_literal(v.value)
             else:
                 value = float(v.value)
             self._instrs += [Instr('pushi' + t.typespec, value)]

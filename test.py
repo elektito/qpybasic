@@ -1863,6 +1863,17 @@ loop until x = 0
     ]
 
 
+class TestHexLiterals1:
+    code = """
+print &hff; &ha0; &h0; &h1; &h002
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 255  160  0  1  2 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
