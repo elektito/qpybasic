@@ -1874,6 +1874,135 @@ print &hff; &ha0; &h0; &h1; &h002
     ]
 
 
+class TestIf1:
+    code = """
+if 2 > 1 then
+    print 10
+else
+    print 20
+end if
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10 \n'),
+    ]
+
+
+class TestIf2:
+    code = """
+if 1 > 2 then
+    print 10
+else
+    print 20
+end if
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 20 \n'),
+    ]
+
+
+class TestIf3:
+    code = """
+if 2 > 1 then
+    print 10
+end if
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10 \n'),
+    ]
+
+
+class TestIf4:
+    code = """
+if 1 > 2 then
+    print 10
+end if
+    """
+
+    cevents = []
+    vevents = []
+
+
+class TestIf5:
+    code = """
+if 2 > 1 then print 10 else print 20
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10 \n'),
+    ]
+
+
+class TestIf6:
+    code = """
+if 1 > 2 then print 10 else print 20
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 20 \n'),
+    ]
+
+
+class TestIf7:
+    code = """
+if 2 > 1 then print 10
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10 \n'),
+    ]
+
+
+class TestIf8:
+    code = """
+if 1 > 2 then print 10
+    """
+
+    cevents = []
+    vevents = []
+
+
+class TestIf9:
+    code = """
+if 2 > 1 then print 10 : print 20
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 10 \n'),
+        ('print', ' 20 \n'),
+    ]
+
+
+class TestIf10:
+    code = """
+if 1 > 2 then print 10 : print 20
+    """
+
+    cevents = []
+    vevents = []
+
+
+class TestIf11:
+    code = """
+if 1 > 2 then print 10 : print 20 else print 30 : print 40
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 30 \n'),
+        ('print', ' 40 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

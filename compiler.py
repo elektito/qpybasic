@@ -1757,6 +1757,30 @@ class Compiler:
         self.compile_ast(body)
 
 
+    def process_if_stmt(self, ast):
+        _, cond, _, *then_stmts, else_clause = ast.children
+        if else_clause.children:
+            _, *else_stmts = else_clause.children
+        else:
+            else_stmts = []
+
+        else_label = self.gen_label('else')
+        end_label = self.gen_label('endif')
+        not_true_label = else_label if else_stmts else end_label
+
+        cond = Expr(cond, self)
+        self.instrs += cond.instrs
+        self.instrs += [Instr('jmpf', not_true_label)]
+        for stmt in then_stmts:
+            self.compile_ast(stmt)
+        if else_stmts:
+            self.instrs += [Instr('jmp', end_label)]
+            self.instrs += [Label(else_label)]
+            for stmt in else_stmts:
+                self.compile_ast(stmt)
+        self.instrs += [Label(end_label)]
+
+
     def process_do_loop_forever(self, ast):
         _, body, _ = ast.children
         self.process_do_loop_block(body)
