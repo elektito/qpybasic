@@ -94,7 +94,10 @@ def parse_int_literal(value):
     if value.startswith('&h'):
         return int(value[2:], base=16)
     else:
-        return int(value)
+        if value[-1] in '%&':
+            return int(value[:-1])
+        else:
+            return int(value)
 
 
 builtin_functions = {
@@ -948,7 +951,10 @@ class Expr:
             if t.name.lower() in ['integer', 'long']:
                 value = parse_int_literal(v.value)
             else:
-                value = float(v.value)
+                if v.value[-1] in '!#':
+                    value = float(v.value[:-1])
+                else:
+                    value = float(v.value)
             self._instrs += [Instr('pushi' + t.typespec, value)]
             self.type = t
             self.is_const = True
