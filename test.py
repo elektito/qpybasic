@@ -2025,6 +2025,28 @@ view print 10 to 20
     ]
 
 
+class TestMod1:
+    code = """
+print 20 * 11 mod 4
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+    ]
+
+
+class TestMod2:
+    code = """
+print 20 + 11 mod 4
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 23 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

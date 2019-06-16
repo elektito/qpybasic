@@ -314,6 +314,10 @@ def_instr(0x65, 'or%', stack=-2)
 def_instr(0x66, 'or&', stack=-4)
 def_instr(0x67, 'xor%', stack=-2)
 def_instr(0x68, 'xor&', stack=-4)
+def_instr(0x69, 'mod%', stack=-2)
+def_instr(0x6a, 'mod&', stack=-4)
+def_instr(0x6b, 'mod!', stack=-4)
+def_instr(0x6c, 'mod#', stack=-8)
 
 # maximum instruction name length, calculated here for formatting
 # purposes.

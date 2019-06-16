@@ -808,6 +808,12 @@ class Expr:
         self.binary_op('sub', left, right)
 
 
+    def process_mod_expr(self, ast):
+        left, _, right = ast.children
+        left, right = Expr(left, self.parent), Expr(right, self.parent)
+        self.binary_op('mod', left, right)
+
+
     def process_expr_mul(self, ast):
         left, right = ast.children
         left, right = Expr(left, self.parent), Expr(right, self.parent)
@@ -986,6 +992,7 @@ class Expr:
             'xor': int(l) ^ int(r),
             'eqv': ~(int(l) ^ int(r)),
             'imp': (~int(l)) | int(r),
+            'mod': l % r,
         }[op]
 
         if all(v.type.typespec in ('%', '&') for v in (left, right)):

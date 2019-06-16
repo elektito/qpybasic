@@ -168,9 +168,12 @@ view_print_stmt: VIEW_KW PRINT_KW [expr TO_KW expr]
              | compare_expr "=" addsub_expr   -> expr_eq
              | compare_expr "<>" addsub_expr   -> expr_ne
 
-?addsub_expr: muldiv_expr
-            | addsub_expr "+" muldiv_expr  -> expr_add
-            | addsub_expr "-" muldiv_expr  -> expr_sub
+?addsub_expr: mod_expr
+            | addsub_expr "+" mod_expr  -> expr_add
+            | addsub_expr "-" mod_expr  -> expr_sub
+
+?mod_expr: muldiv_expr
+         | mod_expr MOD_KW muldiv_expr
 
 ?muldiv_expr: unary_expr
             | muldiv_expr "*" unary_expr  -> expr_mul
@@ -232,6 +235,7 @@ INTEGER_KW: "integer"i
 LET_KW: "let"i
 LONG_KW: "long"i
 LOOP_KW: "loop"i
+MOD_KW: "mod"i
 NEXT_KW: "next"i
 NOT_KW: "not"i
 OR_KW: "or"i

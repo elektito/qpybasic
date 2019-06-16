@@ -522,6 +522,54 @@ class Machine:
         return 0
 
 
+    def exec_mod_integer(self):
+        y = self.pop(2)
+        x = self.pop(2)
+        y, = struct.unpack('>h', y)
+        x, = struct.unpack('>h', x)
+        result = x % y
+        result = struct.pack('>h', result)
+        self.push(result)
+        logger.debug('EXEC: mod%')
+        return 0
+
+
+    def exec_mod_long(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>i', y)
+        x, = struct.unpack('>i', x)
+        result = x % y
+        result = struct.pack('>i', result)
+        self.push(result)
+        logger.debug('EXEC: mod&')
+        return 0
+
+
+    def exec_mod_single(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>f', y)
+        x, = struct.unpack('>f', x)
+        result = x % y
+        result = struct.pack('>f', result)
+        self.push(result)
+        logger.debug('EXEC: mod!')
+        return 0
+
+
+    def exec_mod_double(self):
+        y = self.pop(8)
+        x = self.pop(8)
+        y, = struct.unpack('>d', y)
+        x, = struct.unpack('>d', x)
+        result = x % y
+        result = struct.pack('>d', result)
+        self.push(result)
+        logger.debug('EXEC: mod#')
+        return 0
+
+
     def exec_mul_integer(self):
         y = self.pop(2)
         x = self.pop(2)
