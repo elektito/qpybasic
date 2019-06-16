@@ -38,6 +38,7 @@ lineno: NUMERIC_LITERAL
      | print_stmt
      | rem_stmt
      | return_stmt
+     | view_print_stmt
 
 for_block: _for_stmt block_body next_stmt
 
@@ -136,6 +137,8 @@ _print_sep: SEMICOLON
 rem_stmt: COMMENT_REM
 
 return_stmt: RETURN_KW
+
+view_print_stmt: VIEW_KW PRINT_KW [expr TO_KW expr]
 
 ?expr: imp_expr
 
@@ -243,6 +246,7 @@ THEN_KW: "then"i
 TO_KW: "to"i
 TYPE_KW: "type"i
 UNTIL_KW: "until"i
+VIEW_KW: "view"i
 WHILE_KW: "while"i
 XOR_KW: "xor"i
 

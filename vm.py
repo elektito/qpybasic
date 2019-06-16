@@ -91,6 +91,8 @@ class Machine:
         elif event_name == 'print':
             buf, = args
             print(buf, end='')
+        elif event_name == 'view_print':
+            logger.warning('VIEW PRINT not yet implemented')
         elif event_name == 'error':
             code, = args
             msg = str(ErrorCodes(code))
@@ -865,6 +867,7 @@ class Machine:
             0x07: self.syscall_access_array,
             0x08: self.syscall_malloc,
             0x09: self.syscall_free,
+            0x0a: self.syscall_view_print,
         }.get(value, None)
         if func == None:
             logger.error('Invalid syscall number')
@@ -1171,6 +1174,12 @@ class Machine:
             self.allocator.free(ptr)
         except InvalidPointer as e:
             raise MachineRuntimeError(RE.INVALID_POINTER, f'Invalid pointer: {e.ptr:x}')
+
+
+    def syscall_view_print(self):
+        bottom_line, = struct.unpack('>h', self.pop(2))
+        top_line, = struct.unpack('>h', self.pop(2))
+        self.event_handler(('view_print', top_line, bottom_line))
 
 
     def error(self, msg):

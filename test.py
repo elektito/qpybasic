@@ -2003,6 +2003,28 @@ if 1 > 2 then print 10 : print 20 else print 30 : print 40
     ]
 
 
+class TestViewPrint1:
+    code = """
+view print
+    """
+
+    cevents = []
+    vevents = [
+        ('view_print', -1, -1),
+    ]
+
+
+class TestViewPrint2:
+    code = """
+view print 10 to 20
+    """
+
+    cevents = []
+    vevents = [
+        ('view_print', 10, 20),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

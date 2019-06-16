@@ -1952,6 +1952,20 @@ class Compiler:
         self.instrs += [Instr('ret', 0)]
 
 
+    def process_view_print_stmt(self, ast):
+        if len(ast.children) == 2:
+            self.instrs += [Instr('pushi%', -1),
+                            Instr('pushi%', -1)]
+        else:
+            _, _, top_line, _, bottom_line = ast.children
+            top_line = Expr(top_line, self)
+            bottom_line = Expr(bottom_line, self)
+            self.instrs += top_line.instrs
+            self.instrs += bottom_line.instrs
+
+        self.instrs += [Instr('syscall', '__view_print')]
+
+
     def gen_label(self, prefix):
         if prefix not in self.gen_labels:
             self.gen_labels[prefix] = 1
@@ -2314,6 +2328,7 @@ class Assembler:
                     '__access_array': 0x07,
                     '__malloc': 0x08,
                     '__free': 0x09,
+                    '__view_print': 0x0a,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:
