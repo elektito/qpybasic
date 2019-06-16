@@ -856,24 +856,20 @@ class Machine:
     def exec_syscall(self):
         value = self.mem.read(2)
         value, = struct.unpack('>H', value)
-        if value == 0x02: #cls
-            self.syscall_cls()
-        elif value == 0x03: #concat
-            logger.error('CONCAT not implemented yet. corruption might occur.')
-        elif value == 0x04: #print
-            self.syscall_print()
-        elif value == 0x05: # init_array
-            self.syscall_init_array()
-        elif value == 0x06: # memset
-            self.syscall_memset()
-        elif value == 0x07: # access_array
-            self.syscall_access_array()
-        elif value == 0x08:
-            self.syscall_malloc()
-        elif value == 0x09:
-            self.syscall_free()
+        func = {
+            0x02: self.syscall_cls,
+            0x03: self.syscall_concat,
+            0x04: self.syscall_print,
+            0x05: self.syscall_init_array,
+            0x06: self.syscall_memset,
+            0x07: self.syscall_access_array,
+            0x08: self.syscall_malloc,
+            0x09: self.syscall_free,
+        }.get(value, None)
+        if func == None:
+            logger.error('Invalid syscall number')
         else:
-            logger.error('Invalid syscall number.')
+            func()
         logger.debug('EXEC: syscall')
         return 2
 
@@ -1027,6 +1023,10 @@ class Machine:
     def syscall_cls(self):
         logger.debug('SYSCALL: cls')
         self.event_handler(('cls',))
+
+
+    def syscall_concat(self):
+        logger.error('CONCAT not implemented yet. corruption might occur.')
 
 
     def syscall_print(self):
