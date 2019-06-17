@@ -2061,6 +2061,62 @@ print abs(x%); abs(y%)
     ]
 
 
+class TestAbs2:
+    code = """
+x& = 100
+y& = -100
+
+print abs(x&); abs(y&)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100  100 \n'),
+    ]
+
+
+class TestAbs3:
+    code = """
+x! = 100
+y! = -100
+
+print abs(x!); abs(y!)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100.0  100.0 \n'),
+    ]
+
+
+class TestAbs4:
+    code = """
+x# = 100
+y# = -100
+
+print abs(x#); abs(y#)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100.0  100.0 \n'),
+    ]
+
+
+class TestAbs5:
+    code = """
+const x% = 100
+const y% = -100
+
+print abs(x%); abs(y%)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100  100 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):
