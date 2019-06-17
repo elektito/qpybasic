@@ -2047,6 +2047,20 @@ print 20 + 11 mod 4
     ]
 
 
+class TestAbs1:
+    code = """
+x% = 100
+y% = -100
+
+print abs(x%); abs(y%)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100  100 \n'),
+    ]
+
+
 def run_test_case(name, case):
     events = []
     def event_handler(event):

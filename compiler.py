@@ -86,7 +86,7 @@ def builtin_func_abs(parent, args):
                Instr('jmpf', end_label),
                Instr(f'neg{e.type.typespec}'),
                Label(end_label)]
-    return e.type, e.instrs
+    return e.type, instrs
 
 
 def parse_int_literal(value):
