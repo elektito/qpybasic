@@ -2117,14 +2117,14 @@ print abs(x%); abs(y%)
     ]
 
 
-def run_test_case(name, case):
+def run_test_case(name, case, optimization=0):
     events = []
     def event_handler(event):
         events.append(event)
 
     logger.info(f'Running test case: {name}')
 
-    c = Compiler()
+    c = Compiler(optimization=optimization)
     try:
         module = c.compile(case.code)
     except CompileError as e:
@@ -2179,28 +2179,31 @@ def main():
     failed = []
     success = []
 
-    print(f'Running {len(test_cases)} test case(s).')
-    for name, value in test_cases.items():
-        try:
-            run_test_case(name, value)
-        except Exception as e:
-            failed.append((name, e))
-            if isinstance(e, AssertionError):
-                print('F', end='')
+    for olevel in [0, 1]:
+        print(f'Running {len(test_cases)} test case(s) at optimization level {olevel}...')
+        for name, value in test_cases.items():
+            try:
+                run_test_case(name, value, optimization=olevel)
+            except Exception as e:
+                failed.append((name, e, olevel))
+                if isinstance(e, AssertionError):
+                    print('F', end='')
+                else:
+                    print('E', end='')
             else:
-                print('E', end='')
-        else:
-            success.append(name)
-            print('.', end='')
-        sys.stdout.flush()
+                success.append(name)
+                print('.', end='')
+            sys.stdout.flush()
 
-    print()
+        print()
+
     if len(failed) == 0:
         print(f'All {len(success)} test case(s) ran successfully.')
     else:
         print('Failures:\n')
-        for name, exc in failed:
+        for name, exc, olevel in failed:
             print(f'Failed test case: {name}')
+            print(f'Optimization level: {olevel}')
             print('Exception:')
             traceback.print_exception(type(exc), exc, exc.__traceback__)
         print('---\n')
