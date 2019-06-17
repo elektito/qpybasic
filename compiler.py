@@ -997,18 +997,24 @@ class Expr:
 
     def calc_binary_const(self, op, left, right):
         l, r = left.const_value, right.const_value
+
+        # we use lambdas in the following so that potentially illegal
+        # values (like division by zero) are not performed. For
+        # example, without the lambdas, attempting to calculate the
+        # expression '1 - 0' would cause a division by zero because we
+        # would calculate all of the values, regardless.
         result = {
-            'add': l + r,
-            'sub': l - r,
-            'mul': l * r,
-            'div': l / r,
-            'and': int(l) & int(r),
-            'or': int(l) | int(r),
-            'xor': int(l) ^ int(r),
-            'eqv': ~(int(l) ^ int(r)),
-            'imp': (~int(l)) | int(r),
-            'mod': l % r,
-        }[op]
+            'add': lambda: l + r,
+            'sub': lambda: l - r,
+            'mul': lambda: l * r,
+            'div': lambda: l / r,
+            'and': lambda: int(l) & int(r),
+            'or':  lambda: int(l) | int(r),
+            'xor': lambda: int(l) ^ int(r),
+            'eqv': lambda: ~(int(l) ^ int(r)),
+            'imp': lambda: (~int(l)) | int(r),
+            'mod': lambda: l % r,
+        }[op]()
 
         if all(v.type.typespec in ('%', '&') for v in (left, right)):
             result = int(result)

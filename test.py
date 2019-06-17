@@ -2117,6 +2117,17 @@ print abs(x%); abs(y%)
     ]
 
 
+class TestRegression1:
+    # This used to crash upon compilation because of a bug in constant
+    # folding logic.
+    code = """
+n = 1 - 0
+    """
+
+    cevents = []
+    vevents = []
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     def event_handler(event):
