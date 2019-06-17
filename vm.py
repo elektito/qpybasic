@@ -415,6 +415,22 @@ class Machine:
         return 0
 
 
+    def exec_dup4(self):
+        value = self.pop(4)
+        self.push(value)
+        self.push(value)
+        logger.debug('EXEC: dup4')
+        return 0
+
+
+    def exec_dup8(self):
+        value = self.pop(8)
+        self.push(value)
+        self.push(value)
+        logger.debug('EXEC: dup8')
+        return 0
+
+
     def exec_end(self):
         self.stopped = True
         logger.debug('EXEC: end')
@@ -618,6 +634,16 @@ class Machine:
         return 0
 
 
+    def exec_neg_long(self):
+        x = self.pop(4)
+        x, = struct.unpack('>i', x)
+        result = -x
+        result = struct.pack('>i', result)
+        self.push(result)
+        logger.debug('EXEC: neg&')
+        return 0
+
+
     def exec_neg_single(self):
         x = self.pop(4)
         x, = struct.unpack('>f', x)
@@ -625,6 +651,16 @@ class Machine:
         result = struct.pack('>f', result)
         self.push(result)
         logger.debug('EXEC: neg!')
+        return 0
+
+
+    def exec_neg_double(self):
+        x = self.pop(8)
+        x, = struct.unpack('>d', x)
+        result = -x
+        result = struct.pack('>d', result)
+        self.push(result)
+        logger.debug('EXEC: neg#')
         return 0
 
 
@@ -837,6 +873,45 @@ class Machine:
         return 0
 
 
+    def exec_sgn_long(self):
+        value = self.pop(4)
+        value, = struct.unpack('>i', value)
+        if value > 0:
+            self.push(struct.pack('>h', 1))
+        elif value == 0:
+            self.push(struct.pack('>h', 0))
+        else:
+            self.push(struct.pack('>h', -1))
+        logger.debug('EXEC: sgn&')
+        return 0
+
+
+    def exec_sgn_single(self):
+        value = self.pop(4)
+        value, = struct.unpack('>f', value)
+        if value > 0:
+            self.push(struct.pack('>h', 1))
+        elif value == 0:
+            self.push(struct.pack('>h', 0))
+        else:
+            self.push(struct.pack('>h', -1))
+        logger.debug('EXEC: sgn!')
+        return 0
+
+
+    def exec_sgn_double(self):
+        value = self.pop(8)
+        value, = struct.unpack('>d', value)
+        if value > 0:
+            self.push(struct.pack('>h', 1))
+        elif value == 0:
+            self.push(struct.pack('>h', 0))
+        else:
+            self.push(struct.pack('>h', -1))
+        logger.debug('EXEC: sgn#')
+        return 0
+
+
     def exec_sub_integer(self):
         y = self.pop(2)
         x = self.pop(2)
@@ -970,6 +1045,16 @@ class Machine:
         self.mem.seek(self.fp + idx)
         self.mem.write(value)
         logger.debug('EXEC: writef4')
+        return 2
+
+
+    def exec_writef8(self):
+        idx = self.mem.read(2)
+        idx, = struct.unpack('>h', idx)
+        value = self.pop(8)
+        self.mem.seek(self.fp + idx)
+        self.mem.write(value)
+        logger.debug('EXEC: writef8')
         return 2
 
 

@@ -318,6 +318,7 @@ def_instr(0x69, 'mod%', stack=-2)
 def_instr(0x6a, 'mod&', stack=-4)
 def_instr(0x6b, 'mod!', stack=-4)
 def_instr(0x6c, 'mod#', stack=-8)
+def_instr(0x6d, 'dup8', stack=8)
 
 # maximum instruction name length, calculated here for formatting
 # purposes.
