@@ -78,6 +78,7 @@ def builtin_func_abs(parent, args):
 
     arg, = args
     e = Expr(arg, parent)
+    const_value = abs(e.const_value) if e.is_const else None
     instrs = e.instrs
     end_label = parent.gen_label('abs_end')
     instrs += [Instr(f'dup{e.type.get_size()}'),
@@ -86,7 +87,7 @@ def builtin_func_abs(parent, args):
                Instr('jmpf', end_label),
                Instr(f'neg{e.type.typespec}'),
                Label(end_label)]
-    return e.type, instrs
+    return e.type, instrs, e.is_const, const_value
 
 
 def parse_int_literal(value):
@@ -878,7 +879,7 @@ class Expr:
 
         if fname in builtin_functions:
             f = builtin_functions[fname]
-            self.type, self._instrs = f(self.parent, args)
+            self.type, self._instrs, self.is_const, self.const_value = f(self.parent, args)
             if called_type and self.type != called_type:
                 raise CompileError(EC.FUNC_RET_TYPE_MISMATCH)
         else:
