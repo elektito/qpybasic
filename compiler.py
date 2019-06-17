@@ -789,12 +789,26 @@ class Expr:
         self.binary_logical_op('xor', left, right)
         self._instrs += [Instr(f'not{self.type.typespec}')]
 
+        # binary_logical_op has already done constant folding, but
+        # here we change the value afterward, so we need to do it
+        # again.
+        self.is_const = left.is_const and right.is_const
+        if self.is_const:
+            self.calc_binary_const('eqv', left, right)
+
 
     def process_imp_expr(self, ast):
         left, _, right = ast.children
         left = Expr(left, self.parent)
         right = Expr(right, self.parent)
         self.binary_logical_op('or', left, right, inv_left=True)
+
+        # binary_logical_op has already done constant folding, but
+        # here we change the value afterward, so we need to do it
+        # again.
+        self.is_const = left.is_const and right.is_const
+        if self.is_const:
+            self.calc_binary_const('imp', left, right)
 
 
     def process_expr_add(self, ast):
