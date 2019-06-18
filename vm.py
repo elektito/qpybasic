@@ -309,7 +309,7 @@ class Machine:
         value, = struct.unpack('>i', value)
         value = struct.pack('>f', value)
         self.push(value)
-        logger.debug('EXEC: conv&%')
+        logger.debug('EXEC: conv&!')
         return 0
 
 
