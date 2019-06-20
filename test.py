@@ -956,6 +956,18 @@ print x.x=0; x.y=0; x.z=0; x.w=0
     ]
 
 
+class TestType7:
+    code = """
+type foo
+    x as string
+end type
+    """
+
+    cevents = [
+        ('error', EC.STRING_NOT_ALLOWED_IN_TYPE),
+    ]
+
+
 class TestExitSub1:
     code = """
 sub foo(n as integer)

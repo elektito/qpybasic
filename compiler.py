@@ -150,6 +150,7 @@ class ErrorCodes(IntEnum):
     INVALID_TYPE_ELEMENT = 42
     INVALID_ARRAY_BOUNDS = 43
     EXIT_DO_INVALID = 44
+    STRING_NOT_ALLOWED_IN_TYPE = 45
 
 
     def __str__(self):
@@ -279,6 +280,9 @@ class ErrorCodes(IntEnum):
 
             self.EXIT_DO_INVALID:
             'EXIT not within DO...LOOP',
+
+            self.STRING_NOT_ALLOWED_IN_TYPE:
+            'Variable-length string not allowed in user-defined type.',
         }.get(int(self), super().__str__())
 
 
@@ -1720,6 +1724,9 @@ class Compiler:
             else:
                 e_name, is_array, _, e_type = e.children
                 e_type = self.get_type(e_type.children[0])
+
+            if e_type == Type('$'):
+                raise CompileError(EC.STRING_NOT_ALLOWED_IN_TYPE)
 
             if is_array.children:
                 raise CompileError(EC.INVALID_TYPE_ELEMENT)
