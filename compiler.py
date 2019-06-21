@@ -983,6 +983,8 @@ class Expr:
                     self.is_const = (lv.base.klass == 'const')
                     if self.is_const:
                         self.const_value = lv.base.const_value
+                if lv.type.name == 'STRING':
+                    self._instrs += [Instr('syscall', '__strcpy')]
             else:
                 self.process_function_call(ast.children[0].children[0])
         elif v.type == 'STRING_LITERAL':
@@ -991,6 +993,7 @@ class Expr:
             self.type = Type('$')
             self.is_const = True
             self.const_value = v.value[1:-1]
+            self._instrs += [Instr('syscall', '__strcpy')]
         elif v.type == 'NUMERIC_LITERAL':
             t = get_literal_type(v.value)
             if t.name.lower() in ['integer', 'long']:
@@ -1054,6 +1057,8 @@ class Expr:
         ltype, rtype = left.type.typespec, right.type.typespec
 
         if ltype == rtype == '$' and op == 'add':
+            self._instrs += left.instrs
+            self._instrs += right.instrs
             self._instrs += [Instr('syscall', '__concat')]
             self.type = Type('$')
             return
@@ -1149,7 +1154,8 @@ class Expr:
             if self.type.is_numeric:
                 return [Instr(f'pushi{self.type.typespec}', self.const_value)]
             else:
-                return [Instr(f'pushi$', f'"{self.const_value}"')]
+                return [Instr(f'pushi$', f'"{self.const_value}"'),
+                        Instr('syscall', '__strcpy')]
         else:
             return self._instrs
 
@@ -1925,8 +1931,7 @@ class Compiler:
         if lv.type == Type('$'):
             self.instrs += lv.gen_ref_instructions()
             self.instrs += [Instr('readi4'),
-                            Instr('syscall', '__free'),
-                            Instr('syscall', '__strcpy')]
+                            Instr('syscall', '__free')]
         self.instrs += lv.gen_write_instructions()
 
 
@@ -1943,8 +1948,7 @@ class Compiler:
             if lv.type == Type('$'):
                 self.instrs += lv.gen_ref_instructions()
                 self.instrs += [Instr('readi4'),
-                            Instr('syscall', '__free'),
-                            Instr('syscall', '__strcpy')]
+                                Instr('syscall', '__free')]
             self.instrs += lv.gen_write_instructions()
 
 

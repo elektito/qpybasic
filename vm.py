@@ -1166,7 +1166,18 @@ class Machine:
 
 
     def syscall_concat(self):
-        logger.error('CONCAT not implemented yet. corruption might occur.')
+        rightptr, = struct.unpack('>I', self.pop(4))
+        leftptr, = struct.unpack('>I', self.pop(4))
+        left = self.read_string(leftptr)
+        right = self.read_string(rightptr)
+        self.allocator.free(leftptr)
+        self.allocator.free(rightptr)
+        newstr = left + right
+        newptr = self.allocator.malloc(len(newstr))
+        self.mem.seek(newptr)
+        self.mem.write(struct.pack('>h', len(newstr)))
+        self.mem.write(newstr)
+        self.push(struct.pack('>I', newptr))
 
 
     def syscall_print(self):
@@ -1202,10 +1213,11 @@ class Machine:
                 n, = struct.unpack('>d', n)
                 print_number(n)
             elif typeid == 5: # string
-                n = self.pop(4)
-                n, = struct.unpack('>I', n)
-                s = self.read_string(n)
+                ptr = self.pop(4)
+                ptr, = struct.unpack('>I', ptr)
+                s = self.read_string(ptr)
                 buf += s.decode('ascii')
+                self.allocator.free(ptr)
             elif typeid == 6: # semicolon
                 pass # nothing to do
             elif typeid == 7: # comma
