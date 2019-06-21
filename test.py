@@ -196,6 +196,25 @@ foo "foo", 100
     ]
 
 
+class TestCallSub7:
+    code = """
+sub foo(msg as string)
+   print msg
+   msg = "bar"
+end sub
+
+m$ = "foo"
+call foo(m$)
+print m$
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+        ('print', 'bar\n'),
+    ]
+
+
 class TestSubCallMismatch1:
     code = """
 sub foo(msg as string, n&)
@@ -392,6 +411,28 @@ end sub
         ('print', 'fib 8  21 \n'),
         ('print', 'fib 9  34 \n'),
         ('print', 'fib 10  55 \n'),
+    ]
+
+
+class TestFunctionCall1:
+    code = """
+function foo(x as string)
+    print x
+    x = "bar"
+end function
+
+m$ = "foo"
+r = foo(m$)
+print m$
+m$ = "spam"
+print m$
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+        ('print', 'bar\n'),
+        ('print', 'spam\n'),
     ]
 
 
@@ -2126,6 +2167,46 @@ print abs(x%); abs(y%)
     cevents = []
     vevents = [
         ('print', ' 100  100 \n'),
+    ]
+
+
+class TestString1:
+    code = """
+x$ = "foo"
+y$ = x$
+y$ = "bar"
+
+print x$; y$
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foobar\n'),
+    ]
+
+
+class TestString2:
+    code = """
+dim x(5) as string
+
+x(1) = "foo1"
+x(2) = "foo2"
+x(3) = "foo3"
+x(4) = "foo4"
+x(5) = "foo5"
+
+for i = 1 to 5
+    print x(i)
+next
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo1\n'),
+        ('print', 'foo2\n'),
+        ('print', 'foo3\n'),
+        ('print', 'foo4\n'),
+        ('print', 'foo5\n'),
     ]
 
 

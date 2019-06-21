@@ -67,6 +67,9 @@ class Jump:
 
 
 class Machine:
+    HEAP_START = 0x40000000
+    HEAP_SIZE = 0x40000000
+
     def __init__(self, mem):
         self.mem = mem
         self.sp = 0xffffffff
@@ -77,9 +80,7 @@ class Machine:
         self.check_stack_changes = True
         self.event_handler = self.event_handler_routine
 
-        HEAP_START = 0x40000000
-        HEAP_SIZE = 0x40000000
-        self.allocator = Allocator([(HEAP_START, HEAP_SIZE)])
+        self.allocator = Allocator([(self.HEAP_START, self.HEAP_SIZE)])
 
 
     def event_handler_routine(self, event):
@@ -991,9 +992,12 @@ class Machine:
             0x08: self.syscall_malloc,
             0x09: self.syscall_free,
             0x0a: self.syscall_view_print,
+            0x0b: self.syscall_strcpy,
+            0x0c: self.syscall_init_str_array,
+            0x0d: self.syscall_free_strings_in_array,
         }.get(value, None)
         if func == None:
-            logger.error('Invalid syscall number')
+            logger.error(f'Invalid syscall number: {value}')
         else:
             func()
         logger.debug('EXEC: syscall')
@@ -1315,6 +1319,69 @@ class Machine:
         self.event_handler(('view_print', top_line, bottom_line))
 
 
+    def syscall_strcpy(self):
+        ptr, = struct.unpack('>I', self.pop(4))
+
+        self.mem.seek(ptr)
+        str_len, = struct.unpack('>h', self.mem.read(2))
+        str_data = self.mem.read(str_len)
+
+        new_ptr = self.allocator.malloc(str_len + 2)
+        self.mem.seek(new_ptr)
+        self.mem.write(struct.pack('>h', str_len))
+        self.mem.write(str_data)
+
+        self.push(struct.pack('>I', new_ptr))
+
+
+    def syscall_init_str_array(self):
+        # peek the address on the stack without popping it, since the
+        # next call is going to need it.
+        self.mem.seek(self.sp)
+        addr, = struct.unpack('>I', self.mem.read(4))
+
+        self.syscall_init_array()
+
+        self.mem.seek(addr)
+        ndims, = struct.unpack('>h', self.mem.read(2))
+        n = 1
+        for i in range(ndims):
+            d_from, d_to = struct.unpack('>hh', self.mem.read(4))
+            n *= d_to - d_from + 1
+
+        # allocate an empty string (only 2 bytes for header) for each
+        # element in the array.
+        empty_strings = [self.allocator.malloc(2) for i in range(n)]
+
+        for i in range(n):
+            self.mem.write(struct.pack('>I', empty_strings[i]))
+
+        # now set the header (that is, string length) to zero for all
+        # of the empty strings we previously allocated.
+        for p in empty_strings:
+            self.mem.seek(p)
+            self.mem.write(struct.pack('>h', 0))
+
+
+    def syscall_free_strings_in_array(self):
+        # this system call receives an array of strings as input and
+        # frees all of the strings.
+
+        addr, = struct.unpack('>I', self.pop(4))
+
+        self.mem.seek(addr)
+        ndims, = struct.unpack('>h', self.mem.read(2))
+        n = 1
+        for i in range(ndims):
+            d_from, d_to = struct.unpack('>hh', self.mem.read(4))
+            n *= d_to - d_from + 1
+
+
+        for i in range(n):
+            ptr, = struct.unpack('>I', self.mem.read(4))
+            self.allocator.free(ptr)
+
+
     def error(self, msg):
         logger.error(msg)
         exit(1)
@@ -1323,6 +1390,9 @@ class Machine:
     def shutdown(self):
         self.stopped = True
         self.mem.close()
+
+        assert self.allocator.alloced_slots == []
+        assert self.allocator.free_slots == [(self.HEAP_START, self.HEAP_SIZE)]
 
 
     @staticmethod

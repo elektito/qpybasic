@@ -417,14 +417,34 @@ class Var:
 
 
     def gen_free_instructions(self):
-        if not self.on_heap:
+        # variables that need freeing:
+        #    - anything that is on the heap (dynamic arrays)
+        #    - variable-length strings (which are on the heap)
+        #    - arrays of variable-length strings (whether static or dynamic)
+        if not self.on_heap and \
+           not (self.type.is_array and \
+                self.type.get_base_type_name() == 'STRING') and \
+           not self.type == Type('$'):
             return []
-
-        assert self.byref
 
         instrs = []
         instrs += Lvalue(self).gen_ref_instructions()
-        instrs += [Instr('syscall', '__free')]
+
+        if self.type.is_array and \
+           self.type.get_base_type_name() == 'STRING':
+            # an array of variable-length strings. free the strings first.
+
+            # first duplicate the pointer on the stack because we're
+            # going to use it with two syscalls.
+            instrs += [Instr('dup4'),
+                       Instr('syscall', '__free_strings_in_array')]
+
+        if self.type == Type('$'):
+            # read the actual pointer
+            instrs += [Instr('readi4')]
+
+        if self.on_heap or self.type == Type('$'):
+            instrs += [Instr('syscall', '__free')]
 
         return instrs
 
@@ -1902,6 +1922,11 @@ class Compiler:
             if conv_instrs == None:
                 raise CompileError(EC.TYPE_MISMATCH)
             self.instrs += conv_instrs
+        if lv.type == Type('$'):
+            self.instrs += lv.gen_ref_instructions()
+            self.instrs += [Instr('readi4'),
+                            Instr('syscall', '__free'),
+                            Instr('syscall', '__strcpy')]
         self.instrs += lv.gen_write_instructions()
 
 
@@ -1915,6 +1940,11 @@ class Compiler:
             self.instrs += expr.instrs + conv_instrs
 
             lv = Lvalue(var)
+            if lv.type == Type('$'):
+                self.instrs += lv.gen_ref_instructions()
+                self.instrs += [Instr('readi4'),
+                            Instr('syscall', '__free'),
+                            Instr('syscall', '__strcpy')]
             self.instrs += lv.gen_write_instructions()
 
 
@@ -2144,7 +2174,8 @@ class Compiler:
                     instrs += self.gen_dynamic_array_init(var, lv, dimensions)
             elif var.type.is_basic:
                 if var.type.name == 'STRING':
-                    instrs = [Instr(f'pushi$', '""')]
+                    instrs = [Instr(f'pushi$', '""'),
+                              Instr('syscall', '__strcpy')]
                 else:
                     instrs = [Instr(f'pushi{var.type.typespec}', 0)]
                 instrs += lv.gen_write_instructions()
@@ -2178,7 +2209,10 @@ class Compiler:
                    Instr('pushi%', element_size)]
         instrs += lv.gen_ref_instructions()
 
-        instrs += [Instr('syscall', '__init_array')]
+        if var.type.get_base_type_name() == 'STRING':
+            instrs += [Instr('syscall', '__init_str_array')]
+        else:
+            instrs += [Instr('syscall', '__init_array')]
 
         return instrs
 
@@ -2370,6 +2404,9 @@ class Assembler:
                     '__malloc': 0x08,
                     '__free': 0x09,
                     '__view_print': 0x0a,
+                    '__strcpy': 0x0b,
+                    '__init_str_array': 0x0c,
+                    '__free_strings_in_array': 0x0d,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:
