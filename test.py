@@ -2210,6 +2210,135 @@ next
     ]
 
 
+class TestInput1:
+    code = """
+input x$
+print x$
+    """
+
+    input_lines = [
+        'foo',
+    ]
+
+    cevents = []
+    vevents = [
+        ('print', '? '),
+        ('input',),
+        ('print', 'foo\n'),
+    ]
+
+
+class TestInput2:
+    code = """
+input x$, y$
+print x$; y$
+    """
+
+    input_lines = [
+        'foo, bar',
+    ]
+
+    cevents = []
+    vevents = [
+        ('print', '? '),
+        ('input',),
+        ('print', 'foobar\n'),
+    ]
+
+
+class TestInput3:
+    code = """
+input x$, y$
+print x$; y$
+    """
+
+    input_lines = [
+        'foo',
+        'foo,bar,buz',
+        'foo,bar',
+    ]
+
+    cevents = []
+    vevents = [
+        ('print', '? '),
+        ('input',),
+        ('print', 'Redo from start\n'),
+        ('print', '? '),
+        ('input',),
+        ('print', 'Redo from start\n'),
+        ('print', '? '),
+        ('input',),
+        ('print', 'foobar\n'),
+    ]
+
+
+class TestInput4:
+    code = """
+input n%, x!
+print n%; x!
+    """
+
+    input_lines = [
+        '100,foo',
+        'foo,1.1',
+        '100000,1.1',
+        '100,-1.25',
+    ]
+
+    cevents = []
+    vevents = [
+        ('print', '? '),
+        ('input',),
+        ('print', 'Redo from start\n'),
+        ('print', '? '),
+        ('input',),
+        ('print', 'Redo from start\n'),
+        ('print', '? '),
+        ('input',),
+        ('print', 'Overflow\n'),
+        ('print', 'Redo from start\n'),
+        ('print', '? '),
+        ('input',),
+        ('print', ' 100 -1.25 \n'),
+    ]
+
+
+class TestInput5:
+    code = """
+input "foo"; x$, y$
+print x$; y$
+    """
+
+    input_lines = [
+        'foo, bar'
+    ]
+
+    cevents = []
+    vevents = [
+        ('print', 'foo? '),
+        ('input',),
+        ('print', 'foobar\n'),
+    ]
+
+
+class TestInput6:
+    code = """
+input "foo", x$, y$
+print x$; y$
+    """
+
+    input_lines = [
+        'foo, bar'
+    ]
+
+    cevents = []
+    vevents = [
+        ('print', 'foo'),
+        ('input',),
+        ('print', 'foobar\n'),
+    ]
+
+
 class TestRegression1:
     # This used to crash upon compilation because of a bug in constant
     # folding logic.
@@ -2223,8 +2352,13 @@ n = 1 - 0
 
 def run_test_case(name, case, optimization=0):
     events = []
+    input_idx = 0
     def event_handler(event):
+        nonlocal input_idx
         events.append(event)
+        if event[0] == 'input':
+            input_idx += 1
+            return case.input_lines[input_idx - 1]
 
     logger.info(f'Running test case: {name}')
 

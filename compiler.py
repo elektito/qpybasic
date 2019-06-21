@@ -1848,6 +1848,51 @@ class Compiler:
         self.instrs += [Label(end_label)]
 
 
+    def process_input_stmt(self, ast):
+        if isinstance(ast.children[1], Token) and ast.children[1] == ';':
+            _, _, prompt_phrase, *lvalues = ast.children
+            same_line = True
+        else:
+            _, prompt_phrase, *lvalues = ast.children
+            same_line = False
+
+        if prompt_phrase.children:
+            prompt, sep = prompt_phrase.children
+            prompt = prompt.value[1:-1]
+            sep = sep.value
+        else:
+            prompt = ''
+            sep = ';'
+
+        self.add_string_literal(prompt)
+
+        lvalues = [self.create_lvalue_if_possible(lv) for lv in lvalues]
+        if any(lv == None for lv in lvalues):
+            raise CompileError(EC.INVALID_LVALUE)
+
+        if any(not lv.type.is_basic or lv.type.is_array for lv in lvalues):
+            raise CompileError(EC.TYPE_MISMATCH)
+
+        type_values = {
+            'INTEGER': 1,
+            'LONG': 2,
+            'SINGLE': 3,
+            'DOUBLE': 4,
+            'STRING': 5,
+        }
+
+        for lv in lvalues:
+            self.instrs += lv.gen_ref_instructions()
+            self.instrs += [Instr('pushi%', type_values[lv.type.name])]
+
+        self.instrs += [Instr('pushi%', len(lvalues)),
+                        Instr('pushi$', f'"{prompt}"'),
+                        Instr('pushi%', 0 if sep == ';' else 1),
+                        Instr('pushi%', 0 if not same_line else 1)]
+
+        self.instrs += [Instr('syscall', '__input')]
+
+
     def process_do_loop_forever(self, ast):
         _, body, _ = ast.children
         self.process_do_loop_block(body)
@@ -2411,6 +2456,7 @@ class Assembler:
                     '__strcpy': 0x0b,
                     '__init_str_array': 0x0c,
                     '__free_strings_in_array': 0x0d,
+                    '__input': 0x0e,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:

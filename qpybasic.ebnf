@@ -34,6 +34,7 @@ lineno: NUMERIC_LITERAL
      | gosub_stmt
      | goto_stmt
      | if_stmt
+     | input_stmt
      | let_stmt
      | print_stmt
      | rem_stmt
@@ -125,6 +126,10 @@ goto_stmt: GOTO_KW (ID | NUMERIC_LITERAL)
 if_stmt: IF_KW expr THEN_KW stmt (":" stmt)* else_clause_opt
 
 else_clause_opt: [ELSE_KW stmt (":" stmt)*]
+
+input_stmt: INPUT_KW SEMICOLON? input_prompt_phrase lvalue ("," lvalue)*
+
+input_prompt_phrase: [STRING_LITERAL (SEMICOLON | COMMA)]
 
 let_stmt: LET_KW? lvalue "=" expr
 
@@ -231,6 +236,7 @@ GOSUB_KW: "gosub"i
 GOTO_KW: "goto"i
 IF_KW: "if"i
 IMP_KW: "imp"i
+INPUT_KW: "input"i
 INTEGER_KW: "integer"i
 LET_KW: "let"i
 LONG_KW: "long"i

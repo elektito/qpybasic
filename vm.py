@@ -94,6 +94,8 @@ class Machine:
             print(buf, end='')
         elif event_name == 'view_print':
             logger.warning('VIEW PRINT not yet implemented')
+        elif event_name == 'input':
+            return input()
         elif event_name == 'error':
             code, = args
             msg = str(ErrorCodes(code))
@@ -995,6 +997,7 @@ class Machine:
             0x0b: self.syscall_strcpy,
             0x0c: self.syscall_init_str_array,
             0x0d: self.syscall_free_strings_in_array,
+            0x0e: self.syscall_input,
         }.get(value, None)
         if func == None:
             logger.error(f'Invalid syscall number: {value}')
@@ -1392,6 +1395,88 @@ class Machine:
         for i in range(n):
             ptr, = struct.unpack('>I', self.mem.read(4))
             self.allocator.free(ptr)
+
+
+    def syscall_input(self):
+        # NOTE: the same_line option is, for now, not supported,
+        # although we do take it as a parameter. That's because
+        # implementing it is rather difficult.
+        #
+        # same_line refers to the capability in the INPUT command to
+        # not go to the next line when the user presses ENTER. In
+        # order to enable this option, you should put a semicolon
+        # right after the INPUT command.
+
+        same_line, = struct.unpack('>h', self.pop(2))
+        sep, = struct.unpack('>h', self.pop(2))
+        prompt, = struct.unpack('>I', self.pop(4))
+        nptrs, = struct.unpack('>h', self.pop(2))
+        assert nptrs > 0
+
+        ptrs = []
+        for i in range(nptrs):
+            vtype, = struct.unpack('>h', self.pop(2))
+            ptr, = struct.unpack('>I', self.pop(4))
+            ptrs.append((vtype, ptr))
+
+        prompt = self.read_string(prompt).decode('ascii')
+        if sep == 0:
+            prompt += '? '
+
+        redo = True
+        while redo:
+            self.event_handler(('print', prompt))
+            line = self.event_handler(('input',))
+
+            values = line.split(',')
+            values = [v.strip() for v in values]
+            if len(values) != nptrs:
+                redo = True
+            else:
+                redo = False
+                for i, v in enumerate(reversed(values)):
+                    vtype, ptr = ptrs[i]
+                    try:
+                        if vtype in [1, 2]: # integer and long
+                            v = int(v)
+                        elif vtype in [3, 4]: # single and double
+                            v = float(v)
+                        if vtype == 1 and (v < -32768 or v > 32767):
+                            self.event_handler(('print', 'Overflow\n'))
+                            redo = True
+                    except ValueError:
+                        redo = True
+
+                    if not redo:
+                        self.mem.seek(ptr)
+                        if vtype == 1: # integer
+                            self.mem.write(struct.pack('>h', v))
+                        elif vtype == 2: # long
+                            self.mem.write(struct.pack('>i', v))
+                        elif vtype == 3: # single
+                            self.mem.write(struct.pack('>f', v))
+                        elif vtype == 4: # double
+                            self.mem.write(struct.pack('>d', v))
+                        else:
+                            # ptr is a pointer to a pointer. read the
+                            # actual pointer first.
+                            iptr, = struct.unpack('>I', self.mem.read(4))
+
+                            # free whatever value is in the string variable now
+                            self.allocator.free(iptr)
+
+                            # allocate a new string
+                            s = self.allocator.malloc(2 + len(v))
+                            self.mem.seek(ptr)
+                            self.mem.write(struct.pack('>I', s))
+
+                            # write the actual string value (header + data)
+                            self.mem.seek(s)
+                            self.mem.write(struct.pack('>h', len(v)))
+                            self.mem.write(v.encode('ascii'))
+
+            if redo:
+                self.event_handler(('print', 'Redo from start\n'))
 
 
     def error(self, msg):
