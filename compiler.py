@@ -1945,46 +1945,48 @@ class Compiler:
         self.instrs += [Instr('syscall', '__input')]
 
 
-    def process_do_loop_forever(self, ast):
-        _, body, _ = ast.children
-        self.process_do_loop_block(body)
+    def process_do_stmt(self, ast):
+        if len(ast.children) == 1:
+            cond = None
+        else:
+            _, cond_type, cond = ast.children
 
+            cond_type = cond_type.lower()
+            cond = Expr(cond, self)
 
-    def process_do_loop_cond_top(self, ast):
-        _, cond_type, cond, body, _ = ast.children
-        self.process_do_loop_block(body,
-                                   cond=cond,
-                                   cond_type=cond_type.value.lower(),
-                                   cond_loc='top')
-
-
-    def process_do_loop_cond_bottom(self, ast):
-        _, body, _, cond_type, cond = ast.children
-        self.process_do_loop_block(body,
-                                   cond=cond,
-                                   cond_type=cond_type.value.lower(),
-                                   cond_loc='bottom')
-
-
-    def process_do_loop_block(self, body, *,
-                              cond=None, cond_type=None, cond_loc=None):
         top_label = self.gen_label('loop_top')
         bottom_label = self.gen_label('loop_bottom')
         self.exit_labels.append(('do', bottom_label))
 
-        if cond:
-            cond = Expr(cond, self)
-
         self.instrs += [Label(top_label)]
-        if cond and cond_loc == 'top':
+        if cond:
             self.instrs += cond.instrs
             if cond_type == 'until':
                 self.instrs += [Instr('not%')]
             self.instrs += [Instr('jmpf', bottom_label)]
 
-        self.compile_ast(body)
+        block_data = {
+            'type': 'do',
+            'top_label': top_label,
+            'bottom_label': bottom_label,
+        }
+        self.enter_block(block_data)
 
-        if cond and cond_loc == 'bottom':
+
+    def process_loop_stmt(self, ast):
+        block_data = self.exit_block('do')
+        top_label = block_data['top_label']
+        bottom_label = block_data['bottom_label']
+
+        if len(ast.children) == 1:
+            cond = None
+        else:
+            _, cond_type, cond = ast.children
+
+            cond_type = cond_type.lower()
+            cond = Expr(cond, self)
+
+        if cond:
             self.instrs += cond.instrs
             if cond_type == 'until':
                 self.instrs += [Instr('not%')]

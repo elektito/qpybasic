@@ -6,8 +6,7 @@ _part: (_line | block | toplevel_block) _nl
 
 _nl: _NEWLINE+
 
-?block: do_block
-      | if_block
+?block: if_block
 
 ?toplevel_block: sub_block
                | function_block
@@ -28,6 +27,7 @@ lineno: NUMERIC_LITERAL
      | declare_stmt
      | deftype_stmt
      | dim_stmt
+     | do_stmt
      | end_stmt
      | exit_stmt
      | for_stmt
@@ -36,6 +36,7 @@ lineno: NUMERIC_LITERAL
      | if_stmt
      | input_stmt
      | let_stmt
+     | loop_stmt
      | next_stmt
      | print_stmt
      | rem_stmt
@@ -57,6 +58,10 @@ else_list: ELSEIF_KW expr THEN_KW _NEWLINE block_body else_list  -> elseif_sub_b
 do_block: DO_KW _nl block_body LOOP_KW                              -> do_loop_forever
         | DO_KW (WHILE_KW | UNTIL_KW) expr _nl block_body LOOP_KW   -> do_loop_cond_top
         | DO_KW _nl block_body LOOP_KW (WHILE_KW | UNTIL_KW) expr   -> do_loop_cond_bottom
+
+do_stmt: DO_KW [(WHILE_KW | UNTIL_KW) expr]
+
+loop_stmt: LOOP_KW [(WHILE_KW | UNTIL_KW) expr]
 
 sub_block: SUB_KW ID parameter_list _NEWLINE block_body END_KW SUB_KW
 
