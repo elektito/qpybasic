@@ -2,11 +2,9 @@
 
 program: _nl? _part*
 
-_part: (_line | block | toplevel_block) _nl
+_part: (_line | toplevel_block) _nl
 
 _nl: _NEWLINE+
-
-?block: if_block
 
 ?toplevel_block: sub_block
                | function_block
@@ -28,7 +26,10 @@ lineno: NUMERIC_LITERAL
      | deftype_stmt
      | dim_stmt
      | do_stmt
+     | else_stmt
+     | elseif_stmt
      | end_stmt
+     | end_block_stmt
      | exit_stmt
      | for_stmt
      | gosub_stmt
@@ -48,16 +49,6 @@ for_stmt: FOR_KW ID "=" expr TO_KW expr step_phrase
 step_phrase: [STEP_KW expr]
 
 next_stmt: NEXT_KW [ID]
-
-if_block: IF_KW expr THEN_KW _NEWLINE block_body else_list END_KW IF_KW
-
-else_list: ELSEIF_KW expr THEN_KW _NEWLINE block_body else_list  -> elseif_sub_block
-         | ELSE_KW _NEWLINE block_body                           -> else_sub_block
-         |
-
-do_block: DO_KW _nl block_body LOOP_KW                              -> do_loop_forever
-        | DO_KW (WHILE_KW | UNTIL_KW) expr _nl block_body LOOP_KW   -> do_loop_cond_top
-        | DO_KW _nl block_body LOOP_KW (WHILE_KW | UNTIL_KW) expr   -> do_loop_cond_bottom
 
 do_stmt: DO_KW [(WHILE_KW | UNTIL_KW) expr]
 
@@ -83,8 +74,7 @@ function_block: FUNCTION_KW ID parameter_list _NEWLINE block_body END_KW FUNCTIO
 
 block_body: _block_body_item*
 
-_block_body_item: block _NEWLINE
-                | _line _NEWLINE
+_block_body_item: _line _NEWLINE
                 | _NEWLINE
 
 type_block: TYPE_KW ID _nl (parameter_definition COMMENT_QUOTE? _nl)* END_KW TYPE_KW
@@ -127,9 +117,15 @@ gosub_stmt: GOSUB_KW (ID | NUMERIC_LITERAL)
 
 goto_stmt: GOTO_KW (ID | NUMERIC_LITERAL)
 
-if_stmt: IF_KW expr THEN_KW stmt (":" stmt)* else_clause_opt
+if_stmt: IF_KW expr THEN_KW [stmt (":" stmt)* else_clause_opt]
 
 else_clause_opt: [ELSE_KW stmt (":" stmt)*]
+
+else_stmt: ELSE_KW
+
+elseif_stmt: ELSEIF_KW expr THEN_KW
+
+end_block_stmt: END_KW IF_KW
 
 input_stmt: INPUT_KW SEMICOLON? input_prompt_phrase lvalue ("," lvalue)*
 

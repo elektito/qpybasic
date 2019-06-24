@@ -159,6 +159,7 @@ class ErrorCodes(IntEnum):
     STRING_NOT_ALLOWED_IN_TYPE = 45
     ILLEGAL_NUMBER = 46
     BLOCK_END_MISMATCH = 47
+    SYNTAX_ERROR = 48
 
 
     def __str__(self):
@@ -296,7 +297,10 @@ class ErrorCodes(IntEnum):
             'Illegal number',
 
             self.BLOCK_END_MISMATCH:
-            'Block end mismatch'
+            'Block end mismatch',
+
+            self.SYNTAX_ERROR:
+            'Syntax error',
         }.get(int(self), super().__str__())
 
 
@@ -1831,52 +1835,91 @@ class Compiler:
             self.instrs += [Instr('jmp', f'__lineno_{target.value}')]
 
 
-    def process_if_block(self, ast):
-        _, cond, _, then_body, rest, _, _ = ast.children
+    def process_if_block_begin(self, ast):
+        _, cond, _ = ast.children
+
         cond = Expr(cond, self)
-        self.instrs += cond.instrs + gen_conv_instrs(cond.type, Type('%'))
+        self.instrs += cond.instrs
 
-        self.endif_labels.append(self.gen_label('endif'))
+        # This instruction will be updated upon encountering an ELSE,
+        # ELSEIF or END IF.
+        jmpf_instr = Instr('jmpf', None)
+        self.instrs += [jmpf_instr]
 
-        if rest.children:
-            else_label = self.gen_label('else')
-            self.instrs += [Instr('jmpf', else_label)]
-            self.compile_ast(then_body)
-            self.instrs += [Instr('jmp', self.endif_labels[-1])]
-            self.instrs += [Label(else_label)]
-            self.compile_ast(rest)
-        else:
-            self.instrs += [Instr('jmpf', self.endif_labels[-1])]
-            self.compile_ast(then_body)
-
-        self.instrs += [Label(self.endif_labels[-1])]
-
-        self.endif_labels.pop()
+        block_data = {
+            'type': 'if',
+            'jmpf_instr': jmpf_instr,
+            'endif_label': self.gen_label('endif'),
+            'else_encountered': False,
+        }
+        self.enter_block(block_data)
 
 
-    def process_elseif_sub_block(self, ast):
-        _, cond, _, then_body, rest = ast.children
+    def process_else_stmt(self, ast):
+        block_data = self.exit_block('if')
+        endif_label = block_data['endif_label']
+
+        label = self.gen_label('else')
+        block_data['jmpf_instr'].operands = [label]
+
+        if block_data['else_encountered']:
+            raise CompileError(EC.SYNTAX_ERROR,
+                               'Multiple else statements')
+
+        self.instrs += [Instr('jmp', endif_label),
+                        Label(label)]
+
+        block_data['else_encountered'] = True
+        self.enter_block(block_data)
+
+
+    def process_elseif_stmt(self, ast):
+        _, cond, _ = ast.children
+
+        label = self.gen_label('elseif')
+
+        block_data = self.exit_block('if')
+        endif_label = block_data['endif_label']
+        block_data['jmpf_instr'].operands = [label]
+
+        if block_data['else_encountered']:
+            raise CompileError(EC.SYNTAX_ERROR, 'ELSEIF after ELSE')
+
+        self.instrs += [Instr('jmp', endif_label),
+                        Label(label)]
+
         cond = Expr(cond, self)
-        self.instrs += cond.instrs + gen_conv_instrs(cond.typespec, '%')
+        self.instrs += cond.instrs
 
-        if rest.children:
-            else_label = self.gen_label('else')
-            self.instrs += [Instr('jmpf', else_label)]
-            self.compile_ast(then_body)
-            self.instrs += [Instr('jmp', self.endif_labels[-1])]
-            self.instrs += [Label(else_label)]
-            self.compile_ast(rest)
-        else:
-            self.instrs += [Instr('jmpf', self.endif_labels[-1])]
-            self.compile_ast(then_body)
+        # This instruction will be updated upon encountering an ELSE,
+        # ELSEIF or END IF.
+        jmpf_instr = Instr('jmpf', None)
+        self.instrs += [jmpf_instr]
+
+        block_data['jmpf_instr'] = jmpf_instr
+        self.enter_block(block_data)
 
 
-    def process_else_sub_block(self, ast):
-        _, body = ast.children
-        self.compile_ast(body)
+    def process_end_block_stmt(self, ast):
+        _, block_type = ast.children
+
+        block_type = block_type.lower()
+        assert block_type in ['if']
+
+        block_data = self.exit_block(block_type)
+
+        if block_type == 'if':
+            label = block_data['endif_label']
+            if not block_data['else_encountered']:
+                block_data['jmpf_instr'].operands = [label]
+            self.instrs += [Label(label)]
 
 
     def process_if_stmt(self, ast):
+        if len(ast.children) == 3:
+            self.process_if_block_begin(ast)
+            return
+
         _, cond, _, *then_stmts, else_clause = ast.children
         if else_clause.children:
             _, *else_stmts = else_clause.children

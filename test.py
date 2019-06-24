@@ -2132,6 +2132,108 @@ if 1 > 2 then print 10 : print 20 else print 30 : print 40
     ]
 
 
+class TestIf12:
+    code = """
+if 1 = 1 then
+    print "EQ"
+else
+    print "NEQ"
+end if
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'EQ\n'),
+    ]
+
+
+class TestIf13:
+    code = """
+if 1 = 2 then
+    print "EQ"
+else
+    print "NEQ"
+end if
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'NEQ\n'),
+    ]
+
+
+class TestIf14:
+    code = """
+if 1 = 2 then
+    print "EQ1"
+elseif 2 = 2 then
+    print "EQ2"
+else
+    print "NEQ"
+end if
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'EQ2\n'),
+    ]
+
+
+class TestIf15:
+    code = """
+if 1 = 2 then
+    print "EQ1"
+elseif 2 = 3 then
+    print "EQ2"
+else
+    print "NEQ"
+end if
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'NEQ\n'),
+    ]
+
+
+class TestIf16:
+    code = """
+if 1 = 2 then
+    print "EQ1"
+elseif 2 = 3 then
+    print "EQ2"
+elseif 3 = 3 then
+    print "EQ3"
+else
+    print "NEQ"
+end if
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'EQ3\n'),
+    ]
+
+
+class TestIf17:
+    code = """
+if 1 = 2 then
+    print "EQ1"
+elseif 2 = 3 then
+    print "EQ2"
+elseif 3 = 3 then
+    print "EQ3"
+else
+    print "NEQ"
+end if
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'EQ3\n'),
+    ]
+
+
 class TestViewPrint1:
     code = """
 view print
