@@ -160,6 +160,7 @@ class ErrorCodes(IntEnum):
     ILLEGAL_NUMBER = 46
     BLOCK_END_MISMATCH = 47
     SYNTAX_ERROR = 48
+    ROUTINE_NOT_TOP_LEVEL = 49
 
 
     def __str__(self):
@@ -301,6 +302,9 @@ class ErrorCodes(IntEnum):
 
             self.SYNTAX_ERROR:
             'Syntax error',
+
+            self.ROUTINE_NOT_TOP_LEVEL:
+            'SUB/FUNCTION not top-level',
         }.get(int(self), super().__str__())
 
 
@@ -1667,6 +1671,9 @@ class Compiler:
     def process_sub_stmt(self, ast):
         _, name, params = ast.children
 
+        if self.cur_blocks != []:
+            raise CompileError(EC.ROUTINE_NOT_TOP_LEVEL)
+
         if name[-1] in typespec_chars:
             raise CompileError(EC.INVALID_SUB_NAME)
 
@@ -1722,6 +1729,9 @@ class Compiler:
 
     def process_function_stmt(self, ast):
         _, name, params = ast.children
+
+        if self.cur_blocks != []:
+            raise CompileError(EC.ROUTINE_NOT_TOP_LEVEL)
 
         ftype = self.get_type_from_var_name(name.value)
         name = name.value
