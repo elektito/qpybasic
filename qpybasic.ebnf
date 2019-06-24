@@ -6,8 +6,7 @@ _part: (_line | toplevel_block) _nl
 
 _nl: _NEWLINE+
 
-?toplevel_block: function_block
-               | type_block
+?toplevel_block: type_block
 
 _line: [label | lineno] _stmt_group
 
@@ -31,6 +30,7 @@ lineno: NUMERIC_LITERAL
      | end_block_stmt
      | exit_stmt
      | for_stmt
+     | function_stmt
      | gosub_stmt
      | goto_stmt
      | if_stmt
@@ -70,12 +70,7 @@ typename: INTEGER_KW
         | STRING_KW
         | ID
 
-function_block: FUNCTION_KW ID parameter_list _NEWLINE block_body END_KW FUNCTION_KW
-
-block_body: _block_body_item*
-
-_block_body_item: _line _NEWLINE
-                | _NEWLINE
+function_stmt: FUNCTION_KW ID parameter_list
 
 type_block: TYPE_KW ID _nl (parameter_definition COMMENT_QUOTE? _nl)* END_KW TYPE_KW
 
@@ -125,7 +120,7 @@ else_stmt: ELSE_KW
 
 elseif_stmt: ELSEIF_KW expr THEN_KW
 
-end_block_stmt: END_KW (IF_KW | SUB_KW)
+end_block_stmt: END_KW (IF_KW | SUB_KW | FUNCTION_KW)
 
 input_stmt: INPUT_KW SEMICOLON? input_prompt_phrase lvalue ("," lvalue)*
 

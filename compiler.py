@@ -1720,8 +1720,8 @@ class Compiler:
         self.dim_var(pname, type=ptype, klass='param', byref=True)
 
 
-    def process_function_block(self, ast):
-        _, name, params, body, _, _ = ast.children
+    def process_function_stmt(self, ast):
+        _, name, params = ast.children
 
         ftype = self.get_type_from_var_name(name.value)
         name = name.value
@@ -1765,18 +1765,15 @@ class Compiler:
                 raise CompileError(EC.FUNC_DEF_NOT_MATCH_DECL)
 
         self.routines[name] = self.cur_routine
-        self.compile_ast(body)
 
-        self.instrs[init_loc:init_loc] = self.cur_routine.init_instrs
-
-        arg_size = sum(v.size for v in self.cur_routine.params)
-        self.instrs += [Label(self.cur_routine.exit_label),
-                        Instr('unframe_r', self.cur_routine, ret_var),
-                        Instr(f'ret_r', arg_size, ftype.get_size())]
-        self.cur_routine.instrs = self.instrs
-
-        self.cur_routine = self.routines['__main']
-        self.instrs = saved_instrs
+        block_data = {
+            'type': 'function',
+            'init_loc': init_loc,
+            'saved_instrs': saved_instrs,
+            'ret_var': ret_var,
+            'ftype': ftype,
+        }
+        self.enter_block(block_data)
 
 
     def process_type_block(self, ast):
@@ -1898,7 +1895,7 @@ class Compiler:
         _, block_type = ast.children
 
         block_type = block_type.lower()
-        assert block_type in ['if', 'sub']
+        assert block_type in ['if', 'sub', 'function']
 
         block_data = self.exit_block(block_type)
 
@@ -1918,6 +1915,22 @@ class Compiler:
             self.instrs += self.cur_routine.gen_free_instructions()
             self.instrs += [Instr('unframe', self.cur_routine),
                             Instr('ret', arg_size)]
+            self.cur_routine.instrs = self.instrs
+
+            self.cur_routine = self.routines['__main']
+            self.instrs = saved_instrs
+        elif block_type == 'function':
+            init_loc = block_data['init_loc']
+            ret_var = block_data['ret_var']
+            ftype = block_data['ftype']
+            saved_instrs = block_data['saved_instrs']
+
+            self.instrs[init_loc:init_loc] = self.cur_routine.init_instrs
+
+            arg_size = sum(v.size for v in self.cur_routine.params)
+            self.instrs += [Label(self.cur_routine.exit_label),
+                            Instr('unframe_r', self.cur_routine, ret_var),
+                            Instr(f'ret_r', arg_size, ftype.get_size())]
             self.cur_routine.instrs = self.instrs
 
             self.cur_routine = self.routines['__main']
@@ -2486,7 +2499,7 @@ class Compiler:
     def exit_block(self, block_type):
         block_data = self.cur_blocks.pop()
         if block_data['type'] != block_type:
-            raise CompileError(EC.BLOCK_END_MISMATCH, msg)
+            raise CompileError(EC.BLOCK_END_MISMATCH)
 
         return block_data
 
