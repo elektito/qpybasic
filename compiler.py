@@ -2222,7 +2222,11 @@ class Compiler:
 
         container.add_var(var)
 
-        self.cur_routine.init_instrs += self.gen_init_var(var, dimensions)
+        init_instrs, init_loc = self.gen_init_var(var, dimensions)
+        if init_loc == 'top':
+            self.cur_routine.init_instrs += init_instrs
+        else:
+            self.instrs += init_instrs
 
         if var.klass == 'param':
             pidx = var.container.params.index(var)
@@ -2235,6 +2239,13 @@ class Compiler:
 
 
     def gen_init_var(self, var, dimensions):
+        # Normally, variables should be initialized at the beginning
+        # of the current sub/function, so we set this to 'top' for
+        # now. In case of dynamic arrays, which depend on the current
+        # value of variables at the location where variables are
+        # declared, 'curloc' is returned.
+        init_loc = 'top'
+
         instrs = []
         if var.klass in ['local', 'shared']:
             lv = Lvalue(var)
@@ -2250,6 +2261,7 @@ class Compiler:
                     instrs += self.gen_static_array_init(var, lv, dimensions)
                 else:
                     instrs += self.gen_dynamic_array_init(var, lv, dimensions)
+                    init_loc = 'cur'
             elif var.type.is_basic:
                 if var.type.name == 'STRING':
                     instrs = [Instr(f'pushi$', '""'),
@@ -2263,7 +2275,7 @@ class Compiler:
                 instrs += lv.gen_ref_instructions()
                 instrs += [Instr('syscall', '__memset')]
 
-        return instrs
+        return instrs, init_loc
 
 
     def gen_static_array_init(self, var, lv, dimensions):
