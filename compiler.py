@@ -96,9 +96,15 @@ def parse_int_literal(value):
         return int(value[2:], base=16)
     else:
         if value[-1] in '%&':
-            return int(value[:-1])
+            ret = int(value[:-1])
+
+            if (value[-1] == '%' and (ret < -32768 or ret > 32767)) or \
+               (value[-1] == '&' and (ret < -2**31 or ret > 2**31 - 1)):
+                raise CompileError(EC.ILLEGAL_NUMBER)
         else:
-            return int(value)
+            ret = int(value)
+
+        return ret
 
 
 builtin_functions = {
@@ -151,6 +157,7 @@ class ErrorCodes(IntEnum):
     INVALID_ARRAY_BOUNDS = 43
     EXIT_DO_INVALID = 44
     STRING_NOT_ALLOWED_IN_TYPE = 45
+    ILLEGAL_NUMBER = 46
 
 
     def __str__(self):
@@ -283,6 +290,9 @@ class ErrorCodes(IntEnum):
 
             self.STRING_NOT_ALLOWED_IN_TYPE:
             'Variable-length string not allowed in user-defined type.',
+
+            self.ILLEGAL_NUMBER:
+            'Illegal number',
         }.get(int(self), super().__str__())
 
 

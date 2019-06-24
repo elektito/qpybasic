@@ -1916,7 +1916,33 @@ loop until x = 0
     ]
 
 
-class TestHexLiterals1:
+class TestNumericLiterals1:
+    code = """
+x = .1
+y = 0.1
+
+print x = y
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '-1 \n'),
+    ]
+
+
+class TestNumericLiterals2:
+    code = """
+x% = 100%
+y& = 1000000&
+z! = 1.1!
+w# = 2.2#
+    """
+
+    cevents = []
+    vevents = []
+
+
+class TestNumericLiterals3:
     code = """
 print &hff; &ha0; &h0; &h1; &h002
     """
@@ -1925,6 +1951,56 @@ print &hff; &ha0; &h0; &h1; &h002
     vevents = [
         ('print', ' 255  160  0  1  2 \n'),
     ]
+
+
+class TestNumericLiterals4:
+    code = """
+x% = 32768%
+    """
+
+    cevents = [
+        ('error', EC.ILLEGAL_NUMBER),
+    ]
+    vevents = []
+
+
+class TestNumericLiterals5:
+    code = """
+' Technically this number should (-2^16) be valid, but due to the way
+' negative numbers are implemented (as a positive number, negated),
+' this won't work. Good thing is, the same is true for QB itself!
+x% = -32768%
+    """
+
+    cevents = [
+        ('error', EC.ILLEGAL_NUMBER),
+    ]
+    vevents = []
+
+
+class TestNumericLiterals6:
+    code = """
+x& = 2147483648&
+    """
+
+    cevents = [
+        ('error', EC.ILLEGAL_NUMBER),
+    ]
+    vevents = []
+
+
+class TestNumericLiterals7:
+    code = """
+' Technically this number should (-2^31) be valid, but due to the way
+' negative numbers are implemented (as a positive number, negated),
+' this won't work. Good thing is, the same is true for QB itself!
+x& = -2147483648&
+    """
+
+    cevents = [
+        ('error', EC.ILLEGAL_NUMBER),
+    ]
+    vevents = []
 
 
 class TestIf1:
