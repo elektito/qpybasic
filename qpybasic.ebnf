@@ -72,6 +72,14 @@ typename: INTEGER_KW
 
 function_stmt: FUNCTION_KW ID parameter_list
 
+// Unlike other blocks like FOR, DO, IF, SUB and FUNCTION, so far we
+// haven't been able to make this into separate TYPE/END TYPE
+// statements so that colon separation would work with it, so we'll let
+// it stay. So far I haven't seen many TYPE blocks written as one-liners
+// so hopefully not a big deal for now.
+//
+// The reason this is more difficult than the other blocks is that it
+// doesn't contain normal statements.
 type_block: TYPE_KW ID _nl (parameter_definition COMMENT_QUOTE? _nl)* END_KW TYPE_KW
 
 call_stmt: lvalue argument_list
