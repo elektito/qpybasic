@@ -2426,6 +2426,32 @@ n = 1 - 0
     vevents = []
 
 
+class TestRegression2:
+    # This used to print all values of y as zero. The reason for that
+    # was that initialization of the y variable was inside the
+    # loop. This did not happen to the x variable since it was used in
+    # the loop condition and the condition was evaluated before loop
+    # code was generated, so the initialization happened outside the
+    # loop.
+    code = """
+defint x-y
+do
+    print x; y
+    x = x + 1
+    y = y + 1
+loop while x < 5
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0  0 \n'),
+        ('print', ' 1  1 \n'),
+        ('print', ' 2  2 \n'),
+        ('print', ' 3  3 \n'),
+        ('print', ' 4  4 \n'),
+    ]
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     input_idx = 0

@@ -718,6 +718,7 @@ class Routine(VarContainer):
         self.type = type
         self.compiler = compiler
         self.instrs = []
+        self.init_instrs = []
 
 
     def gen_free_instructions(self):
@@ -1279,8 +1280,14 @@ class Compiler:
                        Label('__main'),
                        Instr('frame', self.routines['__main'])]
 
+        # this is where variable init instructions are to be inserted
+        # later.
+        init_loc = len(self.instrs)
+
         ast = self.parser.parse(code)
         self.compile_ast(ast)
+
+        self.instrs[init_loc:init_loc] = self.cur_routine.init_instrs
 
         self.instrs += self.cur_routine.gen_free_instructions()
         self.instrs += [Instr('unframe', self.routines['__main']),
@@ -1643,6 +1650,10 @@ class Compiler:
         self.instrs += [Label(f'__sub_{name}'),
                         Instr('frame', self.cur_routine)]
 
+        # this is where variable init instructions are to be inserted
+        # later.
+        init_loc = len(self.instrs)
+
         for p in params.children:
             self.parse_param_def(p)
 
@@ -1655,6 +1666,8 @@ class Compiler:
 
         self.routines[name.value] = self.cur_routine
         self.compile_ast(body)
+
+        self.instrs[init_loc:init_loc] = self.cur_routine.init_instrs
 
         arg_size = sum(v.size for v in self.cur_routine.params)
         self.instrs += [Label(self.cur_routine.exit_label)]
@@ -1702,6 +1715,10 @@ class Compiler:
         self.instrs += [Label(f'__function_{name}'),
                         Instr('frame', self.cur_routine)]
 
+        # this is where variable init instructions are to be inserted
+        # later.
+        init_loc = len(self.instrs)
+
         for p in params.children:
             self.parse_param_def(p)
 
@@ -1728,6 +1745,8 @@ class Compiler:
 
         self.routines[name] = self.cur_routine
         self.compile_ast(body)
+
+        self.instrs[init_loc:init_loc] = self.cur_routine.init_instrs
 
         arg_size = sum(v.size for v in self.cur_routine.params)
         self.instrs += [Label(self.cur_routine.exit_label),
@@ -2203,7 +2222,7 @@ class Compiler:
 
         container.add_var(var)
 
-        self.instrs += self.gen_init_var(var, dimensions)
+        self.cur_routine.init_instrs += self.gen_init_var(var, dimensions)
 
         if var.klass == 'param':
             pidx = var.container.params.index(var)
