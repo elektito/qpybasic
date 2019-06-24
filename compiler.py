@@ -723,7 +723,7 @@ class SharedVarContainer(VarContainer):
 
 
 class Routine(VarContainer):
-    def __init__(self, name, type, compiler):
+    def __init__(self, name, type, compiler, *, is_static=False):
         super().__init__(compiler)
 
         self.name = name
@@ -731,6 +731,7 @@ class Routine(VarContainer):
         self.compiler = compiler
         self.instrs = []
         self.init_instrs = []
+        self.is_static = is_static
 
 
     def gen_free_instructions(self):
@@ -1669,6 +1670,12 @@ class Compiler:
 
 
     def process_sub_stmt(self, ast):
+        is_static = False
+        if isinstance(ast.children[-1], Token) and \
+           ast.children[-1].type == 'STATIC_KW':
+            is_static = True
+            ast.children = ast.children[:-1]
+
         _, name, params = ast.children
 
         if self.cur_blocks != []:
@@ -1679,7 +1686,8 @@ class Compiler:
 
         saved_instrs = self.instrs
         self.instrs = []
-        self.cur_routine = Routine(name.value, 'sub', self)
+        self.cur_routine = Routine(name.value, 'sub', self,
+                                   is_static=is_static)
 
         self.instrs += [Label(f'__sub_{name}'),
                         Instr('frame', self.cur_routine)]
@@ -1728,6 +1736,12 @@ class Compiler:
 
 
     def process_function_stmt(self, ast):
+        is_static = False
+        if isinstance(ast.children[-1], Token) and \
+           ast.children[-1].type == 'STATIC_KW':
+            is_static = True
+            ast.children = ast.children[:-1]
+
         _, name, params = ast.children
 
         if self.cur_blocks != []:
@@ -1740,7 +1754,8 @@ class Compiler:
 
         saved_instrs = self.instrs
         self.instrs = []
-        self.cur_routine = Routine(name, 'function', self)
+        self.cur_routine = Routine(name, 'function', self,
+                                   is_static=is_static)
         self.cur_routine.ret_type = ftype
 
         self.instrs += [Label(f'__function_{name}'),
@@ -2260,6 +2275,14 @@ class Compiler:
 
         no_type = (type == None)
 
+        is_ret_var = (used_name[-1] in typespec_chars and \
+                      used_name[:-1] == self.cur_routine.name) or \
+                     (used_name[-1] not in typespec_chars and \
+                      used_name == self.cur_routine.name)
+        if self.cur_routine.is_static and not is_ret_var:
+            used_name = f'__static_{self.cur_routine.type}_{self.cur_routine.name}_{used_name}'
+            klass = 'shared'
+
         if used_name[-1] in typespec_chars:
             name = used_name[:-1]
             typespec = used_name[-1]
@@ -2324,7 +2347,12 @@ class Compiler:
 
         init_instrs, init_loc = self.gen_init_var(var, dimensions)
         if init_loc == 'top':
-            self.cur_routine.init_instrs += init_instrs
+            if klass == 'shared':
+                # shared variables should be initialized once,
+                # globally.
+                self.routines['__main'].init_instrs += init_instrs
+            else:
+                self.cur_routine.init_instrs += init_instrs
         else:
             self.instrs += init_instrs
 
@@ -2455,6 +2483,13 @@ class Compiler:
         else:
             name = used_name
             typespec = None
+
+        is_ret_var = (used_name[-1] in typespec_chars and \
+                      used_name[:-1] == self.cur_routine.name) or \
+                     (used_name[-1] not in typespec_chars and \
+                      used_name == self.cur_routine.name)
+        if self.cur_routine.is_static and not is_ret_var:
+            name = f'__static_{self.cur_routine.type}_{self.cur_routine.name}_{name}'
 
         containers = [self.cur_routine,
                       self.const_container,

@@ -2517,6 +2517,52 @@ print x$; y$
     ]
 
 
+class TestStaticRoutines1:
+    code = """
+defint a-z
+sub foo static
+    n = n + 1
+    print n
+end sub
+
+for i = 1 to 5
+    foo
+next
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 1 \n'),
+        ('print', ' 2 \n'),
+        ('print', ' 3 \n'),
+        ('print', ' 4 \n'),
+        ('print', ' 5 \n'),
+    ]
+
+
+class TestStaticRoutines2:
+    code = """
+defint a-z
+function foo static
+    n = n + 1
+    foo = n
+end function
+
+for i = 1 to 5
+    print foo
+next
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 1 \n'),
+        ('print', ' 2 \n'),
+        ('print', ' 3 \n'),
+        ('print', ' 4 \n'),
+        ('print', ' 5 \n'),
+    ]
+
+
 class TestRegression1:
     # This used to crash upon compilation because of a bug in constant
     # folding logic.

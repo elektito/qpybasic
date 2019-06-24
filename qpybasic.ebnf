@@ -54,7 +54,7 @@ do_stmt: DO_KW [(WHILE_KW | UNTIL_KW) expr]
 
 loop_stmt: LOOP_KW [(WHILE_KW | UNTIL_KW) expr]
 
-sub_stmt: SUB_KW ID parameter_list
+sub_stmt: SUB_KW ID parameter_list [STATIC_KW]
 
 parameter_list: "(" parameter_definition ("," parameter_definition)* ")"
               |
@@ -70,7 +70,7 @@ typename: INTEGER_KW
         | STRING_KW
         | ID
 
-function_stmt: FUNCTION_KW ID parameter_list
+function_stmt: FUNCTION_KW ID parameter_list [STATIC_KW]
 
 // Unlike other blocks like FOR, DO, IF, SUB and FUNCTION, so far we
 // haven't been able to make this into separate TYPE/END TYPE
@@ -252,6 +252,7 @@ PRINT_KW: "print"i
 RETURN_KW: "return"i
 SHARED_KW: "shared"i
 SINGLE_KW: "single"i
+STATIC_KW: "static"i
 STEP_KW: "step"i
 STRING_KW: "string"i
 SUB_KW: "sub"i
