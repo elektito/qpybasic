@@ -1664,8 +1664,8 @@ class Compiler:
         self.exit_labels.pop()
 
 
-    def process_sub_block(self, ast):
-        _, name, params, body, _, _ = ast.children
+    def process_sub_stmt(self, ast):
+        _, name, params = ast.children
 
         if name[-1] in typespec_chars:
             raise CompileError(EC.INVALID_SUB_NAME)
@@ -1692,19 +1692,13 @@ class Compiler:
                 raise CompileError(EC.SUB_DEF_NOT_MATCH_DECL)
 
         self.routines[name.value] = self.cur_routine
-        self.compile_ast(body)
 
-        self.instrs[init_loc:init_loc] = self.cur_routine.init_instrs
-
-        arg_size = sum(v.size for v in self.cur_routine.params)
-        self.instrs += [Label(self.cur_routine.exit_label)]
-        self.instrs += self.cur_routine.gen_free_instructions()
-        self.instrs += [Instr('unframe', self.cur_routine),
-                        Instr('ret', arg_size)]
-        self.cur_routine.instrs = self.instrs
-
-        self.cur_routine = self.routines['__main']
-        self.instrs = saved_instrs
+        block_data = {
+            'type': 'sub',
+            'init_loc': init_loc,
+            'saved_instrs': saved_instrs,
+        }
+        self.enter_block(block_data)
 
 
     def parse_param_def(self, p):
@@ -1904,7 +1898,7 @@ class Compiler:
         _, block_type = ast.children
 
         block_type = block_type.lower()
-        assert block_type in ['if']
+        assert block_type in ['if', 'sub']
 
         block_data = self.exit_block(block_type)
 
@@ -1913,6 +1907,21 @@ class Compiler:
             if not block_data['else_encountered']:
                 block_data['jmpf_instr'].operands = [label]
             self.instrs += [Label(label)]
+        elif block_type == 'sub':
+            init_loc = block_data['init_loc']
+            saved_instrs = block_data['saved_instrs']
+
+            self.instrs[init_loc:init_loc] = self.cur_routine.init_instrs
+
+            arg_size = sum(v.size for v in self.cur_routine.params)
+            self.instrs += [Label(self.cur_routine.exit_label)]
+            self.instrs += self.cur_routine.gen_free_instructions()
+            self.instrs += [Instr('unframe', self.cur_routine),
+                            Instr('ret', arg_size)]
+            self.cur_routine.instrs = self.instrs
+
+            self.cur_routine = self.routines['__main']
+            self.instrs = saved_instrs
 
 
     def process_if_stmt(self, ast):

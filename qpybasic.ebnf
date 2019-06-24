@@ -6,8 +6,7 @@ _part: (_line | toplevel_block) _nl
 
 _nl: _NEWLINE+
 
-?toplevel_block: sub_block
-               | function_block
+?toplevel_block: function_block
                | type_block
 
 _line: [label | lineno] _stmt_group
@@ -42,6 +41,7 @@ lineno: NUMERIC_LITERAL
      | print_stmt
      | rem_stmt
      | return_stmt
+     | sub_stmt
      | view_print_stmt
 
 for_stmt: FOR_KW ID "=" expr TO_KW expr step_phrase
@@ -54,7 +54,7 @@ do_stmt: DO_KW [(WHILE_KW | UNTIL_KW) expr]
 
 loop_stmt: LOOP_KW [(WHILE_KW | UNTIL_KW) expr]
 
-sub_block: SUB_KW ID parameter_list _NEWLINE block_body END_KW SUB_KW
+sub_stmt: SUB_KW ID parameter_list
 
 parameter_list: "(" parameter_definition ("," parameter_definition)* ")"
               |
@@ -125,7 +125,7 @@ else_stmt: ELSE_KW
 
 elseif_stmt: ELSEIF_KW expr THEN_KW
 
-end_block_stmt: END_KW IF_KW
+end_block_stmt: END_KW (IF_KW | SUB_KW)
 
 input_stmt: INPUT_KW SEMICOLON? input_prompt_phrase lvalue ("," lvalue)*
 
