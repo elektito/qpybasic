@@ -158,6 +158,7 @@ class ErrorCodes(IntEnum):
     EXIT_DO_INVALID = 44
     STRING_NOT_ALLOWED_IN_TYPE = 45
     ILLEGAL_NUMBER = 46
+    BLOCK_END_MISMATCH = 47
 
 
     def __str__(self):
@@ -293,6 +294,9 @@ class ErrorCodes(IntEnum):
 
             self.ILLEGAL_NUMBER:
             'Illegal number',
+
+            self.BLOCK_END_MISMATCH:
+            'Block end mismatch'
         }.get(int(self), super().__str__())
 
 
@@ -1263,6 +1267,7 @@ class Compiler:
         self.const_container = VarContainer(self)
         self.shared_container = SharedVarContainer(self)
         self.default_allocation = 'static'
+        self.cur_blocks = []
 
         self.add_string_literal('')
 
@@ -1589,18 +1594,11 @@ class Compiler:
             assert False
 
 
-    def process_for_block(self, ast):
-        _, var, start, _, end, step, body, next_stmt = ast.children
+    def process_for_stmt(self, ast):
+        _, var, start, _, end, step = ast.children
         var = self.get_var(var)
         if var.type.typespec == '$':
             raise CompileError(EC.INVALID_FOR_VAR)
-
-        if len(next_stmt.children) == 2:
-            # "NEXT var" is used. Check if NEXT variable matches FOR
-            # variable.
-            next_var = self.get_var(next_stmt.children[1])
-            if next_var != var:
-                raise CompileError(EC.NEXT_VAR_NOT_MATCH_FOR)
 
         step_var = self.get_var(self.gen_var('for_step', var.type.typespec))
         if step.children:
@@ -1627,13 +1625,38 @@ class Compiler:
         self.instrs += gen_conv_instrs(var.type, Type('%'))
         self.instrs += [Instr('gt'),
                         Instr('jmpt', end_label)]
-        self.compile_ast(body)
+
+        block_data = {
+            'type': 'for',
+            'var': var,
+            'step_var': step_var,
+            'top_label': top_label,
+            'end_label': end_label,
+        }
+        self.enter_block(block_data)
+
+
+    def process_next_stmt(self, ast):
+        block_data = self.exit_block('for')
+        var = block_data['var']
+        step_var = block_data['step_var']
+        top_label = block_data['top_label']
+        end_label = block_data['end_label']
+
+        if len(ast.children) == 2:
+            # "NEXT var" is used. Check if NEXT variable matches FOR
+            # variable.
+            next_var = self.get_var(ast.children[1])
+            if next_var != var:
+                raise CompileError(EC.NEXT_VAR_NOT_MATCH_FOR)
+
         self.instrs += [Instr(f'readf{var.size}', var),
                         Instr(f'readf{step_var.size}', step_var),
                         Instr(f'add{var.type.typespec}')]
         self.instrs += Lvalue(var).gen_write_instructions()
         self.instrs += [Instr('jmp', top_label),
                         Label(end_label)]
+
         self.exit_labels.pop()
 
 
@@ -2400,6 +2423,18 @@ class Compiler:
             self.default_allocation = 'dynamic'
         elif comment == '$static':
             self.default_allocation = 'static'
+
+
+    def enter_block(self, block_data):
+        self.cur_blocks.append(block_data)
+
+
+    def exit_block(self, block_type):
+        block_data = self.cur_blocks.pop()
+        if block_data['type'] != block_type:
+            raise CompileError(EC.BLOCK_END_MISMATCH, msg)
+
+        return block_data
 
 
 class Instr:
