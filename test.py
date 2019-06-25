@@ -2623,6 +2623,96 @@ loop while x < 5
     ]
 
 
+class TestSelect1:
+    code = """
+n = 5
+z = 0
+select case n + 5
+case 5 + z
+     print "five"
+case 10 + z
+     print "ten"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'ten\n'),
+    ]
+
+
+class TestSelect2:
+    code = """
+n = 5
+z = 0
+select case n + 5
+foo:
+case 5 + z
+     print "five"
+case 10 + z
+     print "ten"
+end select
+    """
+
+    cevents = [
+        ('error', EC.SYNTAX_ERROR),
+    ]
+    vevents = []
+
+
+class TestSelect3:
+    code = """
+n = 5
+z = 0
+select case n + 5
+print 1
+case 5 + z
+     print "five"
+case 10 + z
+     print "ten"
+end select
+    """
+
+    cevents = [
+        ('error', EC.SYNTAX_ERROR),
+    ]
+    vevents = []
+
+
+class TestSelect4:
+    code = """
+n = 5
+z = 0
+select case n + 5
+case 100
+     print "five"
+case 200
+     print "ten"
+end select
+    """
+
+    cevents = []
+    vevents = []
+
+
+class TestSelect5:
+    code = """
+n = 5
+z = 0
+select case n + 5
+case 10 + z
+     print "ten"
+case 10 + z
+     print "another ten"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'ten\n'),
+    ]
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     input_idx = 0

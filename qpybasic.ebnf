@@ -18,6 +18,7 @@ label: ID ":"
 lineno: NUMERIC_LITERAL
 
 ?stmt: call_stmt
+     | case_stmt
      | cls_stmt
      | const_stmt
      | declare_stmt
@@ -41,6 +42,7 @@ lineno: NUMERIC_LITERAL
      | print_stmt
      | rem_stmt
      | return_stmt
+     | select_stmt
      | sub_stmt
      | view_print_stmt
 
@@ -128,7 +130,7 @@ else_stmt: ELSE_KW
 
 elseif_stmt: ELSEIF_KW expr THEN_KW
 
-end_block_stmt: END_KW (IF_KW | SUB_KW | FUNCTION_KW)
+end_block_stmt: END_KW (IF_KW | SUB_KW | FUNCTION_KW | SELECT_KW)
 
 input_stmt: INPUT_KW SEMICOLON? input_prompt_phrase lvalue ("," lvalue)*
 
@@ -145,6 +147,13 @@ _print_sep: SEMICOLON
 rem_stmt: COMMENT_REM
 
 return_stmt: RETURN_KW
+
+select_stmt: SELECT_KW CASE_KW expr
+
+case_stmt: CASE_KW expr
+         | CASE_KW IS_KW COMPARE_OP expr  -> case_is_stmt
+         | CASE_KW ELSE_KW                -> case_else_stmt
+
 
 view_print_stmt: VIEW_KW PRINT_KW [expr TO_KW expr]
 
@@ -213,10 +222,12 @@ ID: /[a-z_][a-z0-9]*[!#%&$]?/i
 INT_LITERAL: /\d+/
 NUMERIC_LITERAL: /\d+(\.\d*)?[!#%&]?/i | /(\d*)\.\d+[!#%&]?/i | /&h[\da-f]+/i
 STRING_LITERAL: /"[^"]*"/
+COMPARE_OP: "=" | "<>" | "<" | ">" | "<=" | "=<" | ">=" | "=>"
 
 AND_KW: "and"i
 AS_KW: "as"i
 CALL_KW: "call"i
+CASE_KW: "case"i
 CLS_KW: "cls"i
 CONST_KW: "const"i
 DECLARE_KW: "declare"i
@@ -241,6 +252,7 @@ IF_KW: "if"i
 IMP_KW: "imp"i
 INPUT_KW: "input"i
 INTEGER_KW: "integer"i
+IS_KW: "is"i
 LET_KW: "let"i
 LONG_KW: "long"i
 LOOP_KW: "loop"i
@@ -250,6 +262,7 @@ NOT_KW: "not"i
 OR_KW: "or"i
 PRINT_KW: "print"i
 RETURN_KW: "return"i
+SELECT_KW: "select"i
 SHARED_KW: "shared"i
 SINGLE_KW: "single"i
 STATIC_KW: "static"i

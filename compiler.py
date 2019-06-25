@@ -1941,7 +1941,7 @@ class Compiler:
         _, block_type = ast.children
 
         block_type = block_type.lower()
-        assert block_type in ['if', 'sub', 'function']
+        assert block_type in ['if', 'sub', 'function', 'select']
 
         block_data = self.exit_block(block_type)
 
@@ -1981,6 +1981,12 @@ class Compiler:
 
             self.cur_routine = self.routines['__main']
             self.instrs = saved_instrs
+        elif block_type == 'select':
+            end_label = block_data['end_select_label']
+            jmpf_instr = block_data['jmpf_instr']
+            jmpf_instr.operands = [end_label]
+            jmpf_instr = end_label
+            self.instrs += [Label(end_label)]
 
 
     def process_if_stmt(self, ast):
@@ -2237,6 +2243,67 @@ class Compiler:
         self.instrs += [Instr('ret', 0)]
 
 
+    def process_select_stmt(self, ast):
+        _, _, value = ast.children
+
+        expr = Expr(value, self)
+        if expr.type.is_array or not expr.type.is_basic:
+            raise CompileError(EC.TYPE_MISMATCH)
+        select_var = self.get_var(self.gen_var('select_var', expr.type.typespec))
+        self.gen_set_var_code(select_var, expr)
+
+        block_data = {
+            'type': 'select',
+            'select_var': select_var,
+            'select_instr_idx': len(self.instrs),
+            'hit_first_case': False,
+            'end_select_label': self.gen_label('end_select'),
+        }
+        self.enter_block(block_data)
+
+
+    def process_case_stmt(self, ast):
+        _, case_value = ast.children
+
+        block_data = self.exit_block('select')
+        select_var = block_data['select_var']
+        hit_first_case = block_data['hit_first_case']
+        select_instr_idx = block_data['select_instr_idx']
+        end_select_label = block_data['end_select_label']
+
+        if not hit_first_case and len(self.instrs) != select_instr_idx:
+            raise CompileError(
+                EC.SYNTAX_ERROR,
+                'No statements/labels allowed between SELECT and CASE.')
+
+        label = self.gen_label('case')
+
+        if hit_first_case:
+            self.instrs += [Instr('jmp', end_select_label)]
+
+            last_jmpf_instr = block_data['jmpf_instr']
+            last_jmpf_instr.operands = [label]
+
+        left = Tree('value', [
+            Tree('lvalue', [
+                Tree('lv_base', [Token('ID', select_var.used_name)]),
+                Tree('lv_suffix', [])
+            ])
+        ])
+        expr_tree = Tree('expr_eq', [left, case_value])
+        expr = Expr(expr_tree, self)
+        self.instrs += [Label(label)]
+        self.instrs += expr.instrs
+
+        # The label will be filled in later.
+        jmpf_instr = Instr('jmpf', None)
+        self.instrs += [jmpf_instr]
+
+        block_data['jmpf_instr'] = jmpf_instr
+        block_data['hit_first_case'] = True
+        self.enter_block(block_data)
+
+
     def process_view_print_stmt(self, ast):
         if len(ast.children) == 2:
             self.instrs += [Instr('pushi%', -1),
@@ -2356,6 +2423,7 @@ class Compiler:
         }[klass]
 
         var = Var()
+        var.used_name = used_name
         var.name = name
         var.type = type
         var.container = container
