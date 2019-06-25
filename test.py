@@ -2713,6 +2713,47 @@ end select
     ]
 
 
+class TestSelect6:
+    code = """
+n = 5
+z = 0
+select case n + 5
+case is >= 100
+     print ">=100"
+case is < 100
+     print "<100"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '<100\n'),
+    ]
+
+
+class TestSelect7:
+    code = """
+n = 5
+z = 0
+select case n + 95
+case is > 100
+     print ">100"
+case is < 100
+     print "<100"
+case is = 100
+     print "=100"
+case 100
+     print "=100 again"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '=100\n'),
+    ]
+
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     input_idx = 0

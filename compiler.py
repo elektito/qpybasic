@@ -1322,6 +1322,9 @@ class Compiler:
         ast = self.parser.parse(code)
         self.compile_ast(ast)
 
+        if self.cur_blocks != []:
+            raise CompileError(EC.SYNTAX_ERROR, 'Some blocks were not closed')
+
         self.instrs[init_loc:init_loc] = self.cur_routine.init_instrs
 
         self.instrs += self.cur_routine.gen_free_instructions()
@@ -2291,6 +2294,58 @@ class Compiler:
             ])
         ])
         expr_tree = Tree('expr_eq', [left, case_value])
+        expr = Expr(expr_tree, self)
+        self.instrs += [Label(label)]
+        self.instrs += expr.instrs
+
+        # The label will be filled in later.
+        jmpf_instr = Instr('jmpf', None)
+        self.instrs += [jmpf_instr]
+
+        block_data['jmpf_instr'] = jmpf_instr
+        block_data['hit_first_case'] = True
+        self.enter_block(block_data)
+
+
+    def process_case_is_stmt(self, ast):
+        _, _, op_token, case_value = ast.children
+
+        block_data = self.exit_block('select')
+        select_var = block_data['select_var']
+        hit_first_case = block_data['hit_first_case']
+        select_instr_idx = block_data['select_instr_idx']
+        end_select_label = block_data['end_select_label']
+
+        if not hit_first_case and len(self.instrs) != select_instr_idx:
+            raise CompileError(
+                EC.SYNTAX_ERROR,
+                'No statements/labels allowed between SELECT and CASE.')
+
+        label = self.gen_label('case')
+
+        if hit_first_case:
+            self.instrs += [Instr('jmp', end_select_label)]
+
+            last_jmpf_instr = block_data['jmpf_instr']
+            last_jmpf_instr.operands = [label]
+
+        left = Tree('value', [
+            Tree('lvalue', [
+                Tree('lv_base', [Token('ID', select_var.used_name)]),
+                Tree('lv_suffix', [])
+            ])
+        ])
+        expr_type = {
+            '=': 'expr_eq',
+            '<>': 'expr_ne',
+            '<': 'expr_lt',
+            '>': 'expr_gt',
+            '<=': 'expr_le',
+            '=<': 'expr_le',
+            '>=': 'expr_ge',
+            '=>': 'expr_ge',
+        }[op_token.value]
+        expr_tree = Tree(expr_type, [left, case_value])
         expr = Expr(expr_tree, self)
         self.instrs += [Label(label)]
         self.instrs += expr.instrs

@@ -150,9 +150,9 @@ return_stmt: RETURN_KW
 
 select_stmt: SELECT_KW CASE_KW expr
 
-case_stmt: CASE_KW expr
-         | CASE_KW IS_KW COMPARE_OP expr  -> case_is_stmt
-         | CASE_KW ELSE_KW                -> case_else_stmt
+!case_stmt: CASE_KW expr
+          | CASE_KW IS_KW ("<" | ">" | "=" | "<=" | ">=" | "=<" | "=>" | "<>") expr  -> case_is_stmt
+          | CASE_KW ELSE_KW                -> case_else_stmt
 
 
 view_print_stmt: VIEW_KW PRINT_KW [expr TO_KW expr]
@@ -222,7 +222,6 @@ ID: /[a-z_][a-z0-9]*[!#%&$]?/i
 INT_LITERAL: /\d+/
 NUMERIC_LITERAL: /\d+(\.\d*)?[!#%&]?/i | /(\d*)\.\d+[!#%&]?/i | /&h[\da-f]+/i
 STRING_LITERAL: /"[^"]*"/
-COMPARE_OP: "=" | "<>" | "<" | ">" | "<=" | "=<" | ">=" | "=>"
 
 AND_KW: "and"i
 AS_KW: "as"i
