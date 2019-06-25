@@ -2705,7 +2705,10 @@ class Compiler:
 
 
     def exit_block(self, block_type):
-        block_data = self.cur_blocks.pop()
+        try:
+            block_data = self.cur_blocks.pop()
+        except IndexError:
+            raise CompileError(EC.SYNTAX_ERROR)
         if block_data['type'] != block_type:
             raise CompileError(EC.BLOCK_END_MISMATCH)
 
