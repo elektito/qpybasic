@@ -2856,6 +2856,61 @@ end select
     ]
 
 
+class TestSelect13:
+    code = """
+x$ = "foo"
+select case x$
+case "bar", "spam"
+     print "case-1"
+case "abc", "foo", "sth"
+    print "case-2"
+case "foobar", "eggs"
+     print "case-3"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'case-2\n'),
+    ]
+
+
+class TestSelect14:
+    code = """
+select case 10
+case 10, 20, 30
+     print "case-1"
+case 40, 50, 60
+    print "case-2"
+case else
+     print "case-3"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'case-1\n'),
+    ]
+
+
+class TestSelect15:
+    code = """
+select case 10
+case 20, 30
+     print "case-1"
+case 40, 50, is < 11, 60
+    print "case-2"
+case else
+     print "case-3"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'case-2\n'),
+    ]
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     input_idx = 0

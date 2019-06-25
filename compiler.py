@@ -2268,20 +2268,24 @@ class Compiler:
 
 
     def process_case_stmt(self, ast):
-        _, case_expr = ast.children
+        _, *case_exprs = ast.children
 
-        if isinstance(case_expr.children[0], Token) and \
-           case_expr.children[0].type == 'IS_KW':
-            _, op_token, case_value = case_expr.children
-            operator = op_token.value
-        else:
-            case_value, = case_expr.children
-            operator = "="
+        cases = []
+        for case_expr in case_exprs:
+            if isinstance(case_expr.children[0], Token) and \
+               case_expr.children[0].type == 'IS_KW':
+                _, op_token, case_value = case_expr.children
+                operator = op_token.value
+            else:
+                case_value, = case_expr.children
+                operator = "="
 
-        self.process_case_stmt_variant(operator, case_value)
+            cases.append((operator, case_value))
+
+        self.process_case_stmt_variant(cases)
 
 
-    def process_case_stmt_variant(self, operator, case_value):
+    def process_case_stmt_variant(self, cases):
         block_data = self.exit_block('select')
         select_var = block_data['select_var']
         hit_first_case = block_data['hit_first_case']
@@ -2307,26 +2311,35 @@ class Compiler:
             last_jmpf_instr = block_data['jmpf_instr']
             last_jmpf_instr.operands = [label]
 
+        self.instrs += [Label(label)]
+
         left = Tree('value', [
             Tree('lvalue', [
                 Tree('lv_base', [Token('ID', select_var.used_name)]),
                 Tree('lv_suffix', [])
             ])
         ])
-        expr_type = {
-            '=': 'expr_eq',
-            '<>': 'expr_ne',
-            '<': 'expr_lt',
-            '>': 'expr_gt',
-            '<=': 'expr_le',
-            '=<': 'expr_le',
-            '>=': 'expr_ge',
-            '=>': 'expr_ge',
-        }[operator]
-        expr_tree = Tree(expr_type, [left, case_value])
-        expr = Expr(expr_tree, self)
-        self.instrs += [Label(label)]
-        self.instrs += expr.instrs
+
+        first = True
+        for operator, case_value in cases:
+            expr_type = {
+                '=': 'expr_eq',
+                '<>': 'expr_ne',
+                '<': 'expr_lt',
+                '>': 'expr_gt',
+                '<=': 'expr_le',
+                '=<': 'expr_le',
+                '>=': 'expr_ge',
+                '=>': 'expr_ge',
+            }[operator]
+            expr_tree = Tree(expr_type, [left, case_value])
+            expr = Expr(expr_tree, self)
+            self.instrs += expr.instrs
+
+            if first:
+                first = False
+            else:
+                self.instrs += [Instr('or%')]
 
         # The label will be filled in later.
         jmpf_instr = Instr('jmpf', None)
