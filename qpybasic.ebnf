@@ -20,6 +20,7 @@ lineno: NUMERIC_LITERAL
 ?stmt: call_stmt
      | case_stmt
      | cls_stmt
+     | color_stmt
      | const_stmt
      | declare_stmt
      | deftype_stmt
@@ -91,6 +92,11 @@ argument_list: expr ("," expr)*
              |
 
 cls_stmt: CLS_KW
+
+!color_stmt: COLOR_KW
+           | COLOR_KW expr ["," expr]
+           | COLOR_KW "," expr
+
 
 const_stmt: CONST_KW ID "=" expr
 
@@ -230,6 +236,7 @@ AS_KW: "as"i
 CALL_KW: "call"i
 CASE_KW: "case"i
 CLS_KW: "cls"i
+COLOR_KW: "color"i
 CONST_KW: "const"i
 DECLARE_KW: "declare"i
 DEFDBL_KW: "defdbl"i

@@ -25,6 +25,7 @@ class ErrorCodes(IntEnum):
     SUBSCRIPT_OUT_OF_RANGE = 3
     OUT_OF_MEMORY = 4
     INVALID_POINTER = 5
+    INVALID_COLOR_CODE = 6
 
 
     def __str__(self):
@@ -43,6 +44,9 @@ class ErrorCodes(IntEnum):
 
             self.INVALID_POINTER:
             'Invalid pointer',
+
+            self.INVALID_COLOR_CODE:
+            'Invalid color code',
         }.get(int(self), super().__str__())
 
 
@@ -999,6 +1003,7 @@ class Machine:
             0x0d: self.syscall_free_strings_in_array,
             0x0e: self.syscall_input,
             0x0f: self.syscall_strcmp,
+            0x10: self.syscall_color,
         }.get(value, None)
         if func == None:
             logger.error(f'Invalid syscall number: {value}')
@@ -1503,6 +1508,19 @@ class Machine:
         self.allocator.free(rightptr)
 
         self.push(struct.pack('>h', result))
+
+
+    def syscall_color(self):
+        bg_valid, = struct.unpack('>h', self.pop(2))
+        bg, = struct.unpack('>h', self.pop(2))
+        fg_valid, = struct.unpack('>h', self.pop(2))
+        fg, = struct.unpack('>h', self.pop(2))
+
+        if (bg_valid and (bg < 0 or bg > 15)) or \
+           (fg_valid and (fg < 0 or fg > 15)):
+            raise MachineRuntimeError(RE.INVALID_COLOR_CODE)
+
+        self.event_handler(('color', fg, bg))
 
 
     def error(self, msg):

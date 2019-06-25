@@ -1438,6 +1438,53 @@ class Compiler:
         self.instrs += [Instr('syscall', '__cls')]
 
 
+    def process_color_stmt(self, ast):
+        if len(ast.children) == 1:
+            fg_expr = self.get_constant_expr(-1)
+            bg_expr = self.get_constant_expr(-1)
+            fg_valid = bg_valid = False
+        elif len(ast.children) == 2:
+            _, fg = ast.children
+            fg_expr = Expr(fg, self)
+            bg_expr = self.get_constant_expr(-1)
+            fg_valid = True
+            bg_valid = False
+        elif len(ast.children) == 3:
+            _, _, bg = ast.children
+            fg_expr = self.get_constant_expr(-1)
+            bg_expr = Expr(bg, self)
+            fg_valid = False
+            bg_valid = True
+        elif len(ast.children) == 4:
+            _, fg, _, bg = ast.children
+            fg_expr = Expr(fg, self)
+            bg_expr = Expr(bg, self)
+            fg_valid = bg_valid = True
+        else:
+            assert False
+
+        fg_valid = -1 if fg_valid else 0
+        bg_valid = -1 if bg_valid else 0
+
+        self.instrs += fg_expr.instrs
+        conv_instrs = gen_conv_instrs(fg_expr.type, Type('%'))
+        if conv_instrs == None:
+            raise CompileError(EC.TYPE_MISMATCH)
+        self.instrs += conv_instrs
+
+        self.instrs += [Instr('pushi%', fg_valid)]
+
+        self.instrs += bg_expr.instrs
+        conv_instrs = gen_conv_instrs(bg_expr.type, Type('%'))
+        if conv_instrs == None:
+            raise CompileError(EC.TYPE_MISMATCH)
+        self.instrs += conv_instrs
+
+        self.instrs += [Instr('pushi%', bg_valid)]
+
+        self.instrs += [Instr('syscall', '__color')]
+
+
     def process_const_stmt(self, ast):
         _, name, value = ast.children
         value = Expr(value, self)
@@ -2812,6 +2859,7 @@ class Assembler:
                     '__free_strings_in_array': 0x0d,
                     '__input': 0x0e,
                     '__strcmp': 0x0f,
+                    '__color': 0x10,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:

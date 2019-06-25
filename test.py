@@ -2911,6 +2911,127 @@ end select
     ]
 
 
+class TestColor1:
+    code = """
+color 1, 2
+    """
+
+    cevents = []
+    vevents = [
+        ('color', 1, 2),
+    ]
+
+
+class TestColor2:
+    code = """
+color 1
+    """
+
+    cevents = []
+    vevents = [
+        ('color', 1, -1),
+    ]
+
+
+class TestColor3:
+    code = """
+color , 2
+    """
+
+    cevents = []
+    vevents = [
+        ('color', -1, 2),
+    ]
+
+
+class TestColor4:
+    code = """
+color
+    """
+
+    cevents = []
+    vevents = [
+        ('color', -1, -1),
+    ]
+
+
+class TestColor5:
+    code = """
+color 1, 16
+    """
+
+    cevents = []
+    vevents = [
+        ('error', RE.INVALID_COLOR_CODE),
+    ]
+
+
+class TestColor6:
+    code = """
+color 1, -1
+    """
+
+    cevents = []
+    vevents = [
+        ('error', RE.INVALID_COLOR_CODE),
+    ]
+
+
+class TestColor7:
+    code = """
+color -2, 8
+    """
+
+    cevents = []
+    vevents = [
+        ('error', RE.INVALID_COLOR_CODE),
+    ]
+
+
+class TestColor8:
+    code = """
+color 190, 8
+    """
+
+    cevents = []
+    vevents = [
+        ('error', RE.INVALID_COLOR_CODE),
+    ]
+
+
+class TestColor9:
+    code = """
+color 190, "1"
+    """
+
+    cevents = [
+        ('error', EC.TYPE_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestColor10:
+    code = """
+color "1", 1
+    """
+
+    cevents = [
+        ('error', EC.TYPE_MISMATCH)
+    ]
+    vevents = []
+
+
+class TestColor11:
+    code = """
+color 1.1!, 2.3#
+    """
+
+    cevents = []
+    vevents = [
+        ('color', 1, 2),
+    ]
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     input_idx = 0
