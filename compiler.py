@@ -2270,54 +2270,16 @@ class Compiler:
     def process_case_stmt(self, ast):
         _, case_value = ast.children
 
-        block_data = self.exit_block('select')
-        select_var = block_data['select_var']
-        hit_first_case = block_data['hit_first_case']
-        hit_case_else = block_data['hit_case_else']
-        select_instr_idx = block_data['select_instr_idx']
-        end_select_label = block_data['end_select_label']
-
-        if hit_case_else:
-            raise CompileError(
-                EC.SYNTAX_ERROR,
-                'No CASE allowed after CASE ELSE')
-
-        if not hit_first_case and len(self.instrs) != select_instr_idx:
-            raise CompileError(
-                EC.SYNTAX_ERROR,
-                'No statements/labels allowed between SELECT and CASE.')
-
-        label = self.gen_label('case')
-
-        if hit_first_case:
-            self.instrs += [Instr('jmp', end_select_label)]
-
-            last_jmpf_instr = block_data['jmpf_instr']
-            last_jmpf_instr.operands = [label]
-
-        left = Tree('value', [
-            Tree('lvalue', [
-                Tree('lv_base', [Token('ID', select_var.used_name)]),
-                Tree('lv_suffix', [])
-            ])
-        ])
-        expr_tree = Tree('expr_eq', [left, case_value])
-        expr = Expr(expr_tree, self)
-        self.instrs += [Label(label)]
-        self.instrs += expr.instrs
-
-        # The label will be filled in later.
-        jmpf_instr = Instr('jmpf', None)
-        self.instrs += [jmpf_instr]
-
-        block_data['jmpf_instr'] = jmpf_instr
-        block_data['hit_first_case'] = True
-        self.enter_block(block_data)
+        self.process_case_stmt_variant("=", case_value)
 
 
     def process_case_is_stmt(self, ast):
         _, _, op_token, case_value = ast.children
 
+        self.process_case_stmt_variant(op_token.value, case_value)
+
+
+    def process_case_stmt_variant(self, operator, case_value):
         block_data = self.exit_block('select')
         select_var = block_data['select_var']
         hit_first_case = block_data['hit_first_case']
@@ -2358,7 +2320,7 @@ class Compiler:
             '=<': 'expr_le',
             '>=': 'expr_ge',
             '=>': 'expr_ge',
-        }[op_token.value]
+        }[operator]
         expr_tree = Tree(expr_type, [left, case_value])
         expr = Expr(expr_tree, self)
         self.instrs += [Label(label)]
