@@ -1987,7 +1987,8 @@ class Compiler:
         elif block_type == 'select':
             end_label = block_data['end_select_label']
             jmpf_instr = block_data['jmpf_instr']
-            jmpf_instr.operands = [end_label]
+            if jmpf_instr:
+                jmpf_instr.operands = [end_label]
             jmpf_instr = end_label
             self.instrs += [Label(end_label)]
 
@@ -2260,6 +2261,7 @@ class Compiler:
             'select_var': select_var,
             'select_instr_idx': len(self.instrs),
             'hit_first_case': False,
+            'hit_case_else': False,
             'end_select_label': self.gen_label('end_select'),
         }
         self.enter_block(block_data)
@@ -2271,8 +2273,14 @@ class Compiler:
         block_data = self.exit_block('select')
         select_var = block_data['select_var']
         hit_first_case = block_data['hit_first_case']
+        hit_case_else = block_data['hit_case_else']
         select_instr_idx = block_data['select_instr_idx']
         end_select_label = block_data['end_select_label']
+
+        if hit_case_else:
+            raise CompileError(
+                EC.SYNTAX_ERROR,
+                'No CASE allowed after CASE ELSE')
 
         if not hit_first_case and len(self.instrs) != select_instr_idx:
             raise CompileError(
@@ -2313,8 +2321,14 @@ class Compiler:
         block_data = self.exit_block('select')
         select_var = block_data['select_var']
         hit_first_case = block_data['hit_first_case']
+        hit_case_else = block_data['hit_case_else']
         select_instr_idx = block_data['select_instr_idx']
         end_select_label = block_data['end_select_label']
+
+        if hit_case_else:
+            raise CompileError(
+                EC.SYNTAX_ERROR,
+                'No CASE allowed after CASE ELSE')
 
         if not hit_first_case and len(self.instrs) != select_instr_idx:
             raise CompileError(
@@ -2356,6 +2370,34 @@ class Compiler:
 
         block_data['jmpf_instr'] = jmpf_instr
         block_data['hit_first_case'] = True
+        self.enter_block(block_data)
+
+
+    def process_case_else_stmt(self, ast):
+        block_data = self.exit_block('select')
+        select_var = block_data['select_var']
+        hit_first_case = block_data['hit_first_case']
+        select_instr_idx = block_data['select_instr_idx']
+        end_select_label = block_data['end_select_label']
+
+        if not hit_first_case and len(self.instrs) != select_instr_idx:
+            raise CompileError(
+                EC.SYNTAX_ERROR,
+                'No statements/labels allowed between SELECT and CASE.')
+
+        label = self.gen_label('case_else')
+
+        if hit_first_case:
+            self.instrs += [Instr('jmp', end_select_label)]
+
+            last_jmpf_instr = block_data['jmpf_instr']
+            last_jmpf_instr.operands = [label]
+
+        self.instrs += [Label(label)]
+
+        block_data['jmpf_instr'] = None
+        block_data['hit_first_case'] = True
+        block_data['hit_case_else'] = True
         self.enter_block(block_data)
 
 

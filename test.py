@@ -2753,6 +2753,47 @@ end select
     ]
 
 
+class TestSelect8:
+    code = """
+n = 5
+z = 0
+select case n + 95
+case is > 100
+     print ">100"
+case is < 100
+     print "<100"
+case else
+     print "=100"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '=100\n'),
+    ]
+
+
+class TestSelect9:
+    code = """
+n = 5
+z = 0
+select case n + 95
+case is > 100
+     print ">100"
+case is < 100
+     print "<100"
+case else
+     print "=100"
+case -1
+     print "minus one"
+end select
+    """
+
+    cevents = [
+        ('error', EC.SYNTAX_ERROR),
+    ]
+    vevents = []
+
 
 def run_test_case(name, case, optimization=0):
     events = []
