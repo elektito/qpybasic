@@ -2795,6 +2795,67 @@ end select
     vevents = []
 
 
+class TestSelect10:
+    code = """
+x$ = "foo"
+select case x$
+case "bar"
+     print "baar"
+case "foobar"
+     print "fooobar"
+case "foo"
+     print "fooo"
+case "foo"
+     print "foooo"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'fooo\n'),
+    ]
+
+
+class TestSelect11:
+    code = """
+x$ = "foo"
+select case x$
+case is < "bar"
+     print "baar"
+case is < "foobar"
+     print "fooobar"
+case "foo"
+     print "fooo"
+case "foo"
+     print "foooo"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'fooobar\n'),
+    ]
+
+
+class TestSelect12:
+    code = """
+x$ = "foo"
+select case x$
+case "bar"
+     print "baar"
+case "foobar"
+     print "fooobar"
+case else
+     print "else"
+end select
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'else\n'),
+    ]
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     input_idx = 0
