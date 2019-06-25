@@ -998,6 +998,7 @@ class Machine:
             0x0c: self.syscall_init_str_array,
             0x0d: self.syscall_free_strings_in_array,
             0x0e: self.syscall_input,
+            0x0f: self.syscall_strcmp,
         }.get(value, None)
         if func == None:
             logger.error(f'Invalid syscall number: {value}')
@@ -1477,6 +1478,31 @@ class Machine:
 
             if redo:
                 self.event_handler(('print', 'Redo from start\n'))
+
+
+    def syscall_strcmp(self):
+        operation, = struct.unpack('>h', self.pop(2))
+        rightptr, = struct.unpack('>I', self.pop(4))
+        leftptr, = struct.unpack('>I', self.pop(4))
+
+        left = self.read_string(leftptr)
+        right = self.read_string(rightptr)
+
+        result = {
+            1: lambda: left == right,
+            2: lambda: left != right,
+            3: lambda: left < right,
+            4: lambda: left > right,
+            5: lambda: left <= right,
+            6: lambda: left >= right,
+        }[operation]()
+
+        result = -1 if result else 0
+
+        self.allocator.free(leftptr)
+        self.allocator.free(rightptr)
+
+        self.push(struct.pack('>h', result))
 
 
     def error(self, msg):

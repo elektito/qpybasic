@@ -1156,6 +1156,10 @@ class Expr:
 
 
     def compare_op(self, op, left, right):
+        if left.type.name == right.type.name == 'STRING':
+            self.str_compare_op(op, left, right)
+            return
+
         self.binary_op('sub', left, right)
         self._instrs += gen_conv_instrs(self.type, Type('%'))
         self._instrs += [Instr(op)]
@@ -1170,6 +1174,23 @@ class Expr:
                 'le': self.const_value <= 0,
                 'ge': self.const_value >= 0,
             }[op]
+
+
+    def str_compare_op(self, op, left, right):
+        self._instrs += left.instrs
+        self._instrs += right.instrs
+
+        operation_code = {
+            'eq': 1,
+            'ne': 2,
+            'lt': 3,
+            'gt': 4,
+            'le': 5,
+            'ge': 6,
+        }[op]
+        self._instrs += [Instr('pushi%', operation_code),
+                         Instr('syscall', '__strcmp')]
+        self.type = Type('%')
 
 
     @property
@@ -2645,6 +2666,7 @@ class Assembler:
                     '__init_str_array': 0x0c,
                     '__free_strings_in_array': 0x0d,
                     '__input': 0x0e,
+                    '__strcmp': 0x0f,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:

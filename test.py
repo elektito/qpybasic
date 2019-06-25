@@ -2563,6 +2563,29 @@ next
     ]
 
 
+class TestStrCompare1:
+    code = """
+x$ = "abc"
+y$ = "foo"
+z$ = "bar"
+w$ = "foo"
+s$ = "foobar"
+
+print x$ = y$; x$ < y$; x$ > y$
+print z$ <= y$; z$ >= y$
+print y$ = w$; y$ <> w$; y$ < w$; y$ > w$; y$ <= w$; y$ >= w$
+print w$ < s$; w$ <= s$; w$ >= s$
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 -1  0 \n'),
+        ('print', '-1  0 \n'),
+        ('print', '-1  0  0  0 -1 -1 \n'),
+        ('print', '-1 -1  0 \n'),
+    ]
+
+
 class TestRegression1:
     # This used to crash upon compilation because of a bug in constant
     # folding logic.
