@@ -2268,15 +2268,17 @@ class Compiler:
 
 
     def process_case_stmt(self, ast):
-        _, case_value = ast.children
+        _, case_expr = ast.children
 
-        self.process_case_stmt_variant("=", case_value)
+        if isinstance(case_expr.children[0], Token) and \
+           case_expr.children[0].type == 'IS_KW':
+            _, op_token, case_value = case_expr.children
+            operator = op_token.value
+        else:
+            case_value, = case_expr.children
+            operator = "="
 
-
-    def process_case_is_stmt(self, ast):
-        _, _, op_token, case_value = ast.children
-
-        self.process_case_stmt_variant(op_token.value, case_value)
+        self.process_case_stmt_variant(operator, case_value)
 
 
     def process_case_stmt_variant(self, operator, case_value):
