@@ -385,7 +385,9 @@ class Type:
                 for d_from, d_to in self.dims:
                     n *= d_to - d_from + 1
                 hdr_size = 2 + 2 * 2 * len(self.dims)
-                return hdr_size + n * Type(self.get_base_type_name()).get_size()
+                t = Type(self.get_base_type_name(),
+                         elements=self.elements)
+                return hdr_size + n * t.get_size()
 
         if self.is_basic:
             return {
@@ -1533,8 +1535,8 @@ class Compiler:
                 # form: var AS type
                 pname, lpar_rpar, _, ptype = p.children
                 pname = pname.value
-                ptype = Type(ptype.children[0].value,
-                             is_array=bool(lpar_rpar.children))
+                ptype = self.get_type(ptype.children[0].value,
+                                      is_array=bool(lpar_rpar.children))
             else:
                 # form: var$
                 pname, lpar_rpar = p.children
@@ -2713,7 +2715,7 @@ class Compiler:
             instrs += d_from.instrs
             if d_from.type.typespec != '%':
                 instrs += [Instr(f'conv{d_from.type.typespec}%')]
-        element_size = Type(var.type.get_base_type_name()).get_size()
+        element_size = self.get_type(var.type.get_base_type_name()).get_size()
         instrs += [Instr('pushi%', len(dimensions)),
                    Instr('pushi%', element_size)]
         instrs += lv.gen_ref_instructions()

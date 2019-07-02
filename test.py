@@ -520,6 +520,28 @@ end sub
     ]
 
 
+class TestDeclare2:
+    code = """
+type bar
+    x as integer
+end type
+
+declare sub foo(x() as bar)
+
+dim a(20) as bar
+foo a()
+
+sub foo(x() as bar)
+    print "foo"
+end sub
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
 class TestDeclareDefMismatch1:
     code = """
 declare sub foo(n, m)
