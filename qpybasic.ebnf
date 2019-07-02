@@ -46,6 +46,8 @@ lineno: NUMERIC_LITERAL
      | select_stmt
      | sub_stmt
      | view_print_stmt
+     | wend_stmt
+     | while_stmt
 
 for_stmt: FOR_KW ID "=" expr TO_KW expr step_phrase
 
@@ -122,7 +124,7 @@ dimension: expr [TO_KW expr]
 
 end_stmt: END_CMD
 
-exit_stmt: EXIT_KW (SUB_KW | FUNCTION_KW | FOR_KW | DO_KW)
+exit_stmt: EXIT_KW (SUB_KW | FUNCTION_KW | FOR_KW | DO_KW | WHILE_KW)
 
 gosub_stmt: GOSUB_KW (ID | NUMERIC_LITERAL)
 
@@ -165,6 +167,10 @@ case_stmt: CASE_KW case_expr ("," case_expr)*
 
 
 view_print_stmt: VIEW_KW PRINT_KW [expr TO_KW expr]
+
+while_stmt: WHILE_KW expr
+
+wend_stmt: WEND_KW
 
 ?expr: imp_expr
 
@@ -284,6 +290,7 @@ TYPE_KW: "type"i
 UNTIL_KW: "until"i
 USING_KW: "using"i
 VIEW_KW: "view"i
+WEND_KW: "wend"i
 WHILE_KW: "while"i
 XOR_KW: "xor"i
 

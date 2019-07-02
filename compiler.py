@@ -161,6 +161,7 @@ class ErrorCodes(IntEnum):
     BLOCK_END_MISMATCH = 47
     SYNTAX_ERROR = 48
     ROUTINE_NOT_TOP_LEVEL = 49
+    EXIT_WHILE_INVALID = 50
 
 
     def __str__(self):
@@ -305,6 +306,9 @@ class ErrorCodes(IntEnum):
 
             self.ROUTINE_NOT_TOP_LEVEL:
             'SUB/FUNCTION not top-level',
+
+            self.EXIT_WHILE_INVALID:
+            'EXIT not within WHILE...WEND',
         }.get(int(self), super().__str__())
 
 
@@ -1670,6 +1674,15 @@ class Compiler:
                 raise CompileError(EC.EXIT_DO_INVALID)
 
             self.instrs += [Instr('jmp', label)]
+        elif target == 'while':
+            if self.exit_labels == []:
+                raise CompileError(EC.EXIT_WHILE_INVALID)
+
+            type, label = self.exit_labels[-1]
+            if type != 'while':
+                raise CompileError(EC.EXIT_WHILE_INVALID)
+
+            self.instrs += [Instr('jmp', label)]
         else:
             assert False
 
@@ -2465,6 +2478,41 @@ class Compiler:
             self.instrs += bottom_line.instrs
 
         self.instrs += [Instr('syscall', '__view_print')]
+
+
+    def process_while_stmt(self, ast):
+        _, cond = ast.children
+        cond = Expr(cond, self)
+
+        if not cond.type.is_numeric:
+            raise CompileError(EC.TYPE_MISMATCH)
+
+        top_label = self.gen_label('while')
+        bottom_label = self.gen_label('wend')
+        self.exit_labels.append(('while', bottom_label))
+
+        self.instrs += [Label(top_label)]
+        if cond:
+            self.instrs += cond.instrs
+            self.instrs += [Instr('jmpf', bottom_label)]
+
+        block_data = {
+            'type': 'while',
+            'top_label': top_label,
+            'bottom_label': bottom_label,
+        }
+        self.enter_block(block_data)
+
+
+    def process_wend_stmt(self, ast):
+        block_data = self.exit_block('while')
+        top_label = block_data['top_label']
+        bottom_label = block_data['bottom_label']
+
+        self.instrs += [Instr('jmp', top_label)]
+
+        self.instrs += [Label(bottom_label)]
+        self.exit_labels.pop()
 
 
     def gen_label(self, prefix):

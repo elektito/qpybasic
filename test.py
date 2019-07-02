@@ -1983,6 +1983,112 @@ loop until x = 0
     ]
 
 
+class TestWhileWend1:
+    code = """
+defint x
+while x < 5
+    print x
+    x = x + 1
+wend
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n'),
+        ('print', ' 1 \n'),
+        ('print', ' 2 \n'),
+        ('print', ' 3 \n'),
+        ('print', ' 4 \n'),
+    ]
+
+
+class TestWhileWend2:
+    code = """
+defint x
+while x > 5
+    print x
+    x = x + 1
+wend
+    """
+
+    cevents = []
+    vevents = []
+
+
+class TestWhileWend3:
+    code = """
+defint x
+while 0
+    print "foo"
+wend
+    """
+
+    cevents = []
+    vevents = []
+
+
+class TestWhileWend4:
+    code = """
+defint x
+while -1
+    print "foo"
+    exit while
+    print "bar"
+wend
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
+class TestWhileWend5:
+    code = """
+exit while
+    """
+
+    cevents = [
+        ('error', EC.EXIT_WHILE_INVALID)
+    ]
+    vevents = []
+
+
+class TestWhileWend6:
+    code = """
+for i = 1 to 10
+    exit while
+next
+    """
+
+    cevents = [
+        ('error', EC.EXIT_WHILE_INVALID)
+    ]
+    vevents = []
+
+
+class TestWhileWend7:
+    code = """
+defint x
+while -1
+    while -1
+        print "foo"
+        exit while
+        print "bar"
+    wend
+    print "spam"
+    exit while
+wend
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+        ('print', 'spam\n'),
+    ]
+
+
+
 class TestNumericLiterals1:
     code = """
 x = .1
