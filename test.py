@@ -106,6 +106,73 @@ print 1, 2
     ]
 
 
+class TestPrintUsing1:
+    code = """
+print using "[#####]"; 123
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '[  123]\n'),
+    ]
+
+
+class TestPrintUsing2:
+    code = """
+print using "[##,###] - [##.###]"; 1230; 1.12
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '[ 1,230] - [ 1.120]\n'),
+    ]
+
+
+class TestPrintUsing3:
+    code = """
+' adopted from nibbles!
+print using "#,###,#00  Lives: #  <--JAKE"; 1020; 3
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '  1,02000  Lives: 3  <--JAKE\n'),
+    ]
+
+
+class TestPrintUsing4:
+    code = """
+print using "[##-]"; 1
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '[ 1 ]\n'),
+    ]
+
+
+class TestPrintUsing5:
+    code = """
+print using "[##-]"; -1
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '[ 1-]\n'),
+    ]
+
+
+class TestPrintUsing6:
+    code = """
+print using "[+##]"; -1
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '[ -1]\n'),
+    ]
+
+
 class TestCallSub1:
     code = """
 sub foo

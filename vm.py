@@ -10,6 +10,7 @@ from functools import reduce
 from enum import IntEnum, unique
 from compiler import Module
 from malloc import Allocator, InvalidPointer
+from using import PrintUsingFormatter
 
 
 TRUE = struct.pack('>h', -1)
@@ -1004,6 +1005,7 @@ class Machine:
             0x0e: self.syscall_input,
             0x0f: self.syscall_strcmp,
             0x10: self.syscall_color,
+            0x11: self.syscall_print_using,
         }.get(value, None)
         if func == None:
             logger.error(f'Invalid syscall number: {value}')
@@ -1239,6 +1241,55 @@ class Machine:
         # newline
         if nargs == 0 or typeid not in (6, 7):
             buf += '\n'
+
+        self.event_handler(('print', buf))
+
+
+    def syscall_print_using(self):
+        logger.debug('SYSCALL: print_using')
+
+        nargs = self.pop(2)
+        nargs, = struct.unpack('>h', nargs)
+        logger.info(f'nargs is {nargs}')
+
+        # read format string
+        ptr = self.pop(4)
+        ptr, = struct.unpack('>I', ptr)
+        fmt_str = self.read_string(ptr).decode('ascii')
+        self.allocator.free(ptr)
+
+        args = []
+        for i in range(nargs):
+            typeid = self.pop(2)
+            typeid, = struct.unpack('>h', typeid)
+            if typeid == 1: #int
+                n = self.pop(2)
+                n, = struct.unpack('>h', n)
+                args.append(n)
+            elif typeid == 2: # long
+                n = self.pop(4)
+                n, = struct.unpack('>i', n)
+                args.append(n)
+            elif typeid == 3: # single
+                n = self.pop(4)
+                n, = struct.unpack('>f', n)
+                args.append(n)
+            elif typeid == 4: # double
+                n = self.pop(8)
+                n, = struct.unpack('>d', n)
+                args.append(n)
+            elif typeid == 5: # string
+                ptr = self.pop(4)
+                ptr, = struct.unpack('>I', ptr)
+                s = self.read_string(ptr)
+                args.append(s.decode('ascii'))
+                self.allocator.free(ptr)
+            else:
+               self.error(f'Unknown PRINT USING type id: {typeid}')
+
+        fmt = PrintUsingFormatter(fmt_str)
+        buf = fmt.format(args)
+        buf += '\n'
 
         self.event_handler(('print', buf))
 

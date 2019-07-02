@@ -2286,6 +2286,34 @@ class Compiler:
                        [Instr('syscall', '__print')]
 
 
+    def process_print_using_stmt(self, ast):
+        type_values = {
+            '%': 1,
+            '&': 2,
+            '!': 3,
+            '#': 4,
+            '$': 5,
+        }
+
+        _, _, fmt_expr, *args = ast.children
+
+        fmt_expr = Expr(fmt_expr, self)
+        if fmt_expr.type != Type('$'):
+            raise CompileError(EC.TYPE_MISMATCH)
+
+        parts = []
+        for i in args:
+            expr = Expr(i, self)
+            part_instrs = expr.instrs + \
+                          [Instr('pushi%', type_values[expr.type.typespec])]
+            parts.append(part_instrs)
+
+        self.instrs += sum(reversed(parts), [])
+        self.instrs += fmt_expr.instrs
+        self.instrs += [Instr('pushi%', len(args)),
+                        Instr('syscall', '__print_using')]
+
+
     def process_rem_stmt(self, ast):
         self.check_for_comment_directive(ast.children[0].value[4:])
 
@@ -2860,6 +2888,7 @@ class Assembler:
                     '__input': 0x0e,
                     '__strcmp': 0x0f,
                     '__color': 0x10,
+                    '__print_using': 0x11,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:

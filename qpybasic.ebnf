@@ -146,6 +146,7 @@ let_stmt: LET_KW? lvalue "=" expr
 
 print_stmt: PRINT_KW (expr _print_sep)* expr
           | PRINT_KW expr [_print_sep]
+          | PRINT_KW USING_KW expr (";" expr)*  -> print_using_stmt
 
 _print_sep: SEMICOLON
           | COMMA
@@ -281,6 +282,7 @@ THEN_KW: "then"i
 TO_KW: "to"i
 TYPE_KW: "type"i
 UNTIL_KW: "until"i
+USING_KW: "using"i
 VIEW_KW: "view"i
 WHILE_KW: "while"i
 XOR_KW: "xor"i
