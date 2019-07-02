@@ -503,6 +503,23 @@ print m$
     ]
 
 
+class TestDeclare1:
+    code = """
+declare sub foo
+
+foo
+
+sub foo
+    print "foo"
+end sub
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'foo\n'),
+    ]
+
+
 class TestDeclareDefMismatch1:
     code = """
 declare sub foo(n, m)

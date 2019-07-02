@@ -1508,7 +1508,12 @@ class Compiler:
         if self.cur_routine.name != '__main':
             raise CompileError(EC.DECL_ONLY_AT_TOP)
 
-        _, routine_type, name, params = ast.children
+        if len(ast.children) == 4:
+            _, routine_type, name, params = ast.children
+        else:
+            _, routine_type, name = ast.children
+            params = Tree('parameter_list', [])
+
         name = name.value
         if name[-1] in typespec_chars:
             if routine_type == 'sub':
