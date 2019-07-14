@@ -102,7 +102,12 @@ cls_stmt: CLS_KW
 
 const_stmt: CONST_KW ID "=" expr
 
-declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) ID (parameter_list | "(" ")" )
+declare_stmt: DECLARE_KW (SUB_KW | FUNCTION_KW) ID (decl_param_list | "(" ")" )
+
+decl_param_list: "(" decl_param_def ("," decl_param_def)* ")"
+               |
+
+decl_param_def: ID lpar_rpar [AS_KW (typename | ANY_KW)]
 
 deftype_stmt: (DEFINT_KW | DEFLNG_KW | DEFSNG_KW | DEFDBL_KW | DEFSTR_KW) letter_range ("," letter_range)*
 
@@ -239,6 +244,7 @@ NUMERIC_LITERAL: /\d+(\.\d*)?[!#%&]?/i | /(\d*)\.\d+[!#%&]?/i | /&h[\da-f]+/i
 STRING_LITERAL: /"[^"]*"/
 
 AND_KW: "and"i
+ANY_KW: "any"i
 AS_KW: "as"i
 CALL_KW: "call"i
 CASE_KW: "case"i

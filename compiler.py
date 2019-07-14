@@ -338,6 +338,10 @@ class Type:
     ]
 
     def __init__(self, name, *, is_array=False, elements=None):
+        if name == 'any':
+            self.name = 'any'
+            return
+
         if name in typespec_chars:
             self.name = typespec_to_typename[name]
         else:
@@ -374,6 +378,12 @@ class Type:
             'DOUBLE',
         ]
         return self.name in numeric_types and not self.is_array
+
+
+    @staticmethod
+    def ANY():
+        t = Type('any')
+        return t
 
 
     def get_size(self):
@@ -417,6 +427,9 @@ class Type:
 
 
     def __repr__(self):
+        if self.name == 'any':
+            return '<Type ANY>'
+
         if self.typespec == '':
             name = f'User-Defined: {self.name}'
         else:
@@ -426,6 +439,10 @@ class Type:
 
 
     def __eq__(self, other):
+        if isinstance(other, Type) and \
+           (self.name == 'any' or other.name == 'any'):
+            return True
+
         return isinstance(other, Type) and \
             self.name == other.name and \
             self.is_array == other.is_array
@@ -1535,8 +1552,11 @@ class Compiler:
                 # form: var AS type
                 pname, lpar_rpar, _, ptype = p.children
                 pname = pname.value
-                ptype = self.get_type(ptype.children[0].value,
-                                      is_array=bool(lpar_rpar.children))
+                if isinstance(ptype, Token) and ptype.lower() == 'any':
+                    ptype = Type.ANY()
+                else:
+                    ptype = self.get_type(ptype.children[0].value,
+                                          is_array=bool(lpar_rpar.children))
             else:
                 # form: var$
                 pname, lpar_rpar = p.children
