@@ -542,6 +542,29 @@ end sub
     ]
 
 
+class TestDeclare3:
+    code = """
+declare sub foobar(x as any)
+
+type bar
+   x as integer
+end type
+
+dim b as bar
+foobar b
+print b.x
+
+sub foobar(x as bar)
+    x.x = 1000
+end sub
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 1000 \n'),
+    ]
+
+
 class TestDeclareDefMismatch1:
     code = """
 declare sub foo(n, m)
