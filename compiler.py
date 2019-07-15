@@ -847,9 +847,10 @@ class Expr:
         else:
             raise CompileError(EC.TYPE_MISMATCH)
 
+        self.type = e.type
         self.is_const = e.is_const
         if self.is_const:
-            self.const_value = ~e.const_value
+            self.const_value = ~int(e.const_value)
 
 
     def process_and_expr(self, ast):

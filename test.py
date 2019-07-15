@@ -2997,6 +2997,33 @@ END SUB
     vevents = []
 
 
+class TestRegression4:
+    # This used to error out because the .type field of the Expr
+    # object was not being set in the NOT expression.
+
+    code = """
+print not 1.1
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '-2 \n'),
+    ]
+
+
+class TestRegression5:
+    # This used to error out due to trying to get the NOT of a float
+    # (when folding constants).
+
+    code = """
+CONST TRUE = -1
+CONST FALSE = NOT TRUE
+    """
+
+    cevents = []
+    vevents = []
+
+
 class TestSelect1:
     code = """
 n = 5
