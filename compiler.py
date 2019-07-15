@@ -2382,6 +2382,18 @@ class Compiler:
                         Instr('syscall', '__print_using')]
 
 
+    def process_randomize_stmt(self, ast):
+        _, seed = ast.children
+
+        seed = Expr(seed, self)
+        if not seed.type.is_numeric:
+            raise CompileError(EC.TYPE_MISMATCH)
+
+        self.instrs += seed.instrs
+        self.instrs += gen_conv_instrs(seed.type, Type('&'))
+        self.instrs += [Instr('syscall', '__randomize')]
+
+
     def process_rem_stmt(self, ast):
         self.check_for_comment_directive(ast.children[0].value[4:])
 
@@ -2994,6 +3006,7 @@ class Assembler:
                     '__print_using': 0x11,
                     '__seconds_since_midnight': 0x12,
                     '__rnd': 0x13,
+                    '__randomize': 0x14,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:

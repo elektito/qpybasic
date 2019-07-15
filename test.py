@@ -2683,6 +2683,28 @@ print timer
     ]
 
 
+class TestRandomize1:
+    code = """
+randomize 100
+    """
+
+    cevents = []
+    vevents = [
+        ('randomize', 100)
+    ]
+
+
+class TestRandomize2:
+    code = """
+randomize "foo"
+    """
+
+    cevents = [
+        ('error', EC.TYPE_MISMATCH),
+    ]
+    vevents = []
+
+
 class TestString1:
     code = """
 x$ = "foo"

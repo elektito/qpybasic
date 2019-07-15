@@ -41,6 +41,7 @@ lineno: NUMERIC_LITERAL
      | loop_stmt
      | next_stmt
      | print_stmt
+     | randomize_stmt
      | rem_stmt
      | return_stmt
      | select_stmt
@@ -157,6 +158,8 @@ print_stmt: PRINT_KW (expr _print_sep)* expr
 
 _print_sep: SEMICOLON
           | COMMA
+
+randomize_stmt: RANDOMIZE_KW expr
 
 rem_stmt: COMMENT_REM
 
@@ -282,6 +285,7 @@ NEXT_KW: "next"i
 NOT_KW: "not"i
 OR_KW: "or"i
 PRINT_KW: "print"i
+RANDOMIZE_KW: "randomize"i
 RETURN_KW: "return"i
 SELECT_KW: "select"i
 SHARED_KW: "shared"i

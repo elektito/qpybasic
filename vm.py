@@ -99,6 +99,9 @@ class MachineIo:
             seconds_since_midnight = (now - midnight).total_seconds()
 
             return seconds_since_midnight
+        elif event_name == 'randomize':
+            seed, = args
+            random.seed(seed)
         elif event_name == 'rnd':
             n, = args
             if n > 0:
@@ -1043,6 +1046,7 @@ class Machine:
             0x11: self.syscall_print_using,
             0x12: self.syscall_seconds_since_midnight,
             0x13: self.syscall_rnd,
+            0x14: self.syscall_randomize,
         }.get(value, None)
         if func == None:
             logger.error(f'Invalid syscall number: {value}')
@@ -1341,6 +1345,11 @@ class Machine:
         n, = struct.unpack('>h', self.pop(2))
         r = self.event_handler(('rnd', n))
         self.push(struct.pack('>f', r))
+
+
+    def syscall_randomize(self):
+        seed, = struct.unpack('>i', self.pop(4))
+        self.event_handler(('randomize', seed))
 
 
     def syscall_init_array(self):
