@@ -5,6 +5,7 @@ import logging
 import argparse
 import asm
 import logging.config
+from datetime import datetime
 from mmap import mmap
 from functools import reduce
 from enum import IntEnum, unique
@@ -101,6 +102,12 @@ class Machine:
             logger.warning('VIEW PRINT not yet implemented')
         elif event_name == 'input':
             return input()
+        elif event_name == 'seconds_since_midnight':
+            now = datetime.now()
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            seconds_since_midnight = (now - midnight).total_seconds()
+
+            return seconds_since_midnight
         elif event_name == 'error':
             code, = args
             msg = str(ErrorCodes(code))
@@ -1006,6 +1013,7 @@ class Machine:
             0x0f: self.syscall_strcmp,
             0x10: self.syscall_color,
             0x11: self.syscall_print_using,
+            0x12: self.syscall_seconds_since_midnight,
         }.get(value, None)
         if func == None:
             logger.error(f'Invalid syscall number: {value}')
@@ -1292,6 +1300,12 @@ class Machine:
         buf += '\n'
 
         self.event_handler(('print', buf))
+
+
+    def syscall_seconds_since_midnight(self):
+        seconds_since_midnight = self.event_handler(('seconds_since_midnight',))
+
+        self.push(struct.pack('>f', seconds_since_midnight))
 
 
     def syscall_init_array(self):

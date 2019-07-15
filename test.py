@@ -2583,6 +2583,20 @@ print abs(x%); abs(y%)
     ]
 
 
+class TestTimer1:
+    code = """
+print timer
+    """
+
+    seconds_since_midnight = lambda: 10000.25
+
+    cevents = []
+    vevents = [
+        ('seconds_since_midnight',),
+        ('print', ' 10000.25 \n'),
+    ]
+
+
 class TestString1:
     code = """
 x$ = "foo"
@@ -3276,6 +3290,8 @@ def run_test_case(name, case, optimization=0):
         if event[0] == 'input':
             input_idx += 1
             return case.input_lines[input_idx - 1]
+        elif event[0] == 'seconds_since_midnight':
+            return case.seconds_since_midnight()
 
     logger.info(f'Running test case: {name}')
 

@@ -90,6 +90,15 @@ def builtin_func_abs(parent, args):
     return e.type, instrs, e.is_const, const_value
 
 
+def builtin_func_timer(parent, args):
+    if len(args) != 0:
+        raise CompileError(EC.INVALID_FUNC_NARGS)
+
+    instrs = [Instr('syscall', '__seconds_since_midnight')]
+    return Type('!'), instrs, False, 0
+
+
+
 def parse_int_literal(value):
     value = value.lower()
     if value.startswith('&h'):
@@ -109,6 +118,7 @@ def parse_int_literal(value):
 
 builtin_functions = {
     'abs': builtin_func_abs,
+    'timer': builtin_func_timer,
 }
 
 
@@ -2964,6 +2974,7 @@ class Assembler:
                     '__strcmp': 0x0f,
                     '__color': 0x10,
                     '__print_using': 0x11,
+                    '__seconds_since_midnight': 0x12,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:
