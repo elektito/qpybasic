@@ -983,6 +983,7 @@ class Expr:
         else:
             fname, = ast.children
             args = []
+        orig_fname = fname
         fname = fname.lower()
         if fname[-1] in typespec_chars:
             called_type = self.parent.get_type_from_var_name(fname)
@@ -1009,7 +1010,7 @@ class Expr:
                     raise CompileError(EC.ARGUMENT_COUNT_MISMATCH)
                 self.type = declared.ret_type
             else:
-                raise CompileError(EC.NO_SUCH_FUNC, f'No such function: {fname}')
+                raise CompileError(EC.NO_SUCH_FUNC, f'No such function: {orig_fname}')
 
             if called_type and self.type != called_type:
                 raise CompileError(EC.FUNC_RET_TYPE_MISMATCH)
