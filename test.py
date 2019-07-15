@@ -5,6 +5,7 @@ import traceback
 import unittest
 import sys
 import argparse
+import random
 from compiler import Compiler, CompileError, EC
 from vm import Machine, RE
 
@@ -2583,6 +2584,91 @@ print abs(x%); abs(y%)
     ]
 
 
+class TestRnd1:
+    code = """
+print rnd
+    """
+
+    random_numbers = [0.25]
+
+    cevents = []
+    vevents = [
+        ('rnd', 1),
+        ('print', ' 0.25 \n'),
+    ]
+
+
+class TestRnd2:
+    code = """
+print rnd(1)
+    """
+
+    random_numbers = [0.25]
+
+    cevents = []
+    vevents = [
+        ('rnd', 1),
+        ('print', ' 0.25 \n'),
+    ]
+
+
+class TestRnd3:
+    code = """
+print rnd(-1)
+    """
+
+    random_numbers = [0.25]
+
+    cevents = []
+    vevents = [
+        ('rnd', -1),
+        ('print', ' 0.25 \n'),
+    ]
+
+
+class TestRnd4:
+    code = """
+print rnd
+print rnd(0)
+    """
+
+    random_numbers = [0.25, 0.5]
+
+    cevents = []
+    vevents = [
+        ('rnd', 1),
+        ('print', ' 0.25 \n'),
+        ('rnd', 0),
+        ('print', ' 0.25 \n'),
+    ]
+
+
+class TestRnd5:
+    code = """
+print rnd("foo")
+    """
+
+    random_numbers = [0.25]
+
+    cevents = [
+        ('error', EC.TYPE_MISMATCH),
+    ]
+    vevents = []
+
+
+class TestRnd6:
+    code = """
+print rnd(1, 2)
+    """
+
+    random_numbers = [0.25]
+
+    cevents = [
+        ('error', EC.INVALID_FUNC_NARGS),
+    ]
+    vevents = []
+
+
 class TestTimer1:
     code = """
 print timer
@@ -3290,6 +3376,14 @@ def run_test_case(name, case, optimization=0):
         if event[0] == 'input':
             input_idx += 1
             return case.input_lines[input_idx - 1]
+        elif event[0] == 'rnd':
+            if not hasattr(case, 'random_idx'):
+                case.random_idx = 0
+            if hasattr(case, 'random_numbers'):
+                r = case.random_numbers[case.random_idx]
+            else:
+                r = random.random()
+            return r
         elif event[0] == 'seconds_since_midnight':
             return case.seconds_since_midnight()
 

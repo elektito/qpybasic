@@ -90,13 +90,30 @@ def builtin_func_abs(parent, args):
     return e.type, instrs, e.is_const, const_value
 
 
+def builtin_func_rnd(parent, args):
+    if len(args) > 1:
+        raise CompileError(EC.INVALID_FUNC_NARGS)
+    elif len(args) == 1:
+        arg, = args
+        expr = Expr(arg, parent)
+        arg_instrs = expr.instrs
+        if not expr.type.is_numeric:
+            raise CompileError(EC.TYPE_MISMATCH)
+
+        arg_instrs += gen_conv_instrs(expr.type, Type('%'))
+    else:
+        arg_instrs = [Instr('pushi%', 1)]
+
+    instrs = arg_instrs + [Instr('syscall', '__rnd')]
+    return Type('!'), instrs, False, 0
+
+
 def builtin_func_timer(parent, args):
     if len(args) != 0:
         raise CompileError(EC.INVALID_FUNC_NARGS)
 
     instrs = [Instr('syscall', '__seconds_since_midnight')]
     return Type('!'), instrs, False, 0
-
 
 
 def parse_int_literal(value):
@@ -118,6 +135,7 @@ def parse_int_literal(value):
 
 builtin_functions = {
     'abs': builtin_func_abs,
+    'rnd': builtin_func_rnd,
     'timer': builtin_func_timer,
 }
 
@@ -2975,6 +2993,7 @@ class Assembler:
                     '__color': 0x10,
                     '__print_using': 0x11,
                     '__seconds_since_midnight': 0x12,
+                    '__rnd': 0x13,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:

@@ -3,6 +3,7 @@
 import struct
 import logging
 import argparse
+import random
 import asm
 import logging.config
 from datetime import datetime
@@ -72,24 +73,14 @@ class Jump:
         self.target = target
 
 
-class Machine:
-    HEAP_START = 0x40000000
-    HEAP_SIZE = 0x40000000
+class MachineIo:
+    def __init__(self):
+        self.last_random_number = 0.5
 
-    def __init__(self, mem):
-        self.mem = mem
-        self.sp = 0xffffffff
-        self.fp = self.sp
-        self.ip = 0x100000
-        self.stopped = False
-
-        self.check_stack_changes = True
-        self.event_handler = self.event_handler_routine
-
-        self.allocator = Allocator([(self.HEAP_START, self.HEAP_SIZE)])
+        random.seed(0)
 
 
-    def event_handler_routine(self, event):
+    def event_handler(self, event):
         event_name, *args = event
         if event_name == 'cls':
             seq =  '\033[2J'    # clear screen
@@ -108,12 +99,49 @@ class Machine:
             seconds_since_midnight = (now - midnight).total_seconds()
 
             return seconds_since_midnight
+        elif event_name == 'rnd':
+            n, = args
+            if n > 0:
+                r = random.random()
+            elif n == 0:
+                print('last:', self.last_random_number)
+                r = self.last_random_number
+            else:
+                prev_state = random.getstate()
+                random.seed(n)
+                r = random.random()
+                random.setstate(prev_state)
+
+            self.last_random_number = r
+            return r
         elif event_name == 'error':
             code, = args
             msg = str(ErrorCodes(code))
             logger.error(f'Machine error: {msg}')
         else:
             logger.error(f'Unknown machine event: {event_name}')
+
+
+class Machine:
+    HEAP_START = 0x40000000
+    HEAP_SIZE = 0x40000000
+
+    def __init__(self, mem):
+        self.mem = mem
+        self.sp = 0xffffffff
+        self.fp = self.sp
+        self.ip = 0x100000
+        self.stopped = False
+        self.io = MachineIo()
+
+        self.check_stack_changes = True
+        self.event_handler = self.event_handler_routine
+
+        self.allocator = Allocator([(self.HEAP_START, self.HEAP_SIZE)])
+
+
+    def event_handler_routine(self, event):
+        return self.io.event_handler(event)
 
 
     def launch(self):
@@ -1014,6 +1042,7 @@ class Machine:
             0x10: self.syscall_color,
             0x11: self.syscall_print_using,
             0x12: self.syscall_seconds_since_midnight,
+            0x13: self.syscall_rnd,
         }.get(value, None)
         if func == None:
             logger.error(f'Invalid syscall number: {value}')
@@ -1306,6 +1335,12 @@ class Machine:
         seconds_since_midnight = self.event_handler(('seconds_since_midnight',))
 
         self.push(struct.pack('>f', seconds_since_midnight))
+
+
+    def syscall_rnd(self):
+        n, = struct.unpack('>h', self.pop(2))
+        r = self.event_handler(('rnd', n))
+        self.push(struct.pack('>f', r))
 
 
     def syscall_init_array(self):
