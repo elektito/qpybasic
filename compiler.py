@@ -805,7 +805,7 @@ class Routine(VarContainer):
 
     @property
     def exit_label(self):
-        return f'__{self.type}_{self.name}_exit'
+        return f'__{self.type}_{self.name.lower()}_exit'
 
 
     def __repr__(self):
@@ -1438,8 +1438,11 @@ class Compiler:
         else:
             sub_name = sub_name.value
 
+        orig_name = sub_name
+        sub_name = sub_name.lower()
+
         defined = self.routines.get(sub_name, None)
-        declared = self.declared_routines.get(sub_name, None)
+        declared = self.declared_routines.get(sub_name.lower(), None)
         if declared and declared.type != 'sub':
             declared = None
 
@@ -1451,7 +1454,7 @@ class Compiler:
                 raise CompileError(EC.ARGUMENT_COUNT_MISMATCH)
         elif not defined and not declared:
             raise CompileError(EC.NO_SUCH_SUB,
-                               f'No such sub-routine: {sub_name}')
+                               f'No such sub-routine: {orig_name}')
 
         i = len(args.children) - 1
         for a in reversed(args.children):
@@ -1468,7 +1471,7 @@ class Compiler:
                     if lv.type != self.routines[sub_name].params[i].type:
                         raise CompileError(EC.PARAM_TYPE_MISMATCH)
                 else:
-                    if lv.type != self.declared_routines[sub_name].param_types[i]:
+                    if lv.type != self.declared_routines[sub_name.lower()].param_types[i]:
                         raise CompileError(EC.PARAM_TYPE_MISMATCH)
                 self.instrs += lv.gen_ref_instructions()
             else:
@@ -1476,7 +1479,7 @@ class Compiler:
                 if sub_name in self.routines:
                     typespec = self.routines[sub_name].params[i].type.typespec
                 else:
-                    typespec = self.declared_routines[sub_name].param_types[i].typespec
+                    typespec = self.declared_routines[sub_name.lower()].param_types[i].typespec
                 v = self.get_var(self.gen_var('rvalue', typespec))
                 self.gen_set_var_code(v, e)
                 self.instrs += [Instr('pushfp', v)]
@@ -1564,7 +1567,8 @@ class Compiler:
 
         routine_type = routine_type.lower()
 
-        name = name.value
+        orig_name = name.value
+        name = name.lower()
         if name[-1] in typespec_chars:
             if routine_type == 'sub':
                 raise CompileError(EC.INVALID_SUB_NAME)
@@ -1608,7 +1612,7 @@ class Compiler:
                self.declared_routines[name].param_types != param_types:
                 raise CompileError(EC.CONFLICTING_DECL)
         else:
-            dr = DeclaredRoutine(routine_type, name, param_types, ret_type)
+            dr = DeclaredRoutine(routine_type, orig_name, param_types, ret_type)
             self.declared_routines[name] = dr
 
 
@@ -1819,6 +1823,8 @@ class Compiler:
             ast.children = ast.children[:-1]
 
         _, name, params = ast.children
+        orig_name = name
+        name = name.lower()
 
         if self.cur_blocks != []:
             raise CompileError(EC.ROUTINE_NOT_TOP_LEVEL)
@@ -1828,7 +1834,7 @@ class Compiler:
 
         saved_instrs = self.instrs
         self.instrs = []
-        self.cur_routine = Routine(name.value, 'sub', self,
+        self.cur_routine = Routine(orig_name, 'sub', self,
                                    is_static=is_static)
 
         self.instrs += [Label(f'__sub_{name}'),
@@ -1848,7 +1854,7 @@ class Compiler:
                defined_param_types != r.param_types:
                 raise CompileError(EC.SUB_DEF_NOT_MATCH_DECL)
 
-        self.routines[name.value] = self.cur_routine
+        self.routines[name] = self.cur_routine
 
         block_data = {
             'type': 'sub',
@@ -1890,13 +1896,14 @@ class Compiler:
             raise CompileError(EC.ROUTINE_NOT_TOP_LEVEL)
 
         ftype = self.get_type_from_var_name(name.value)
-        name = name.value
         if name[-1] in typespec_chars:
             name = name[:-1]
+        orig_name = name
+        name = name.lower()
 
         saved_instrs = self.instrs
         self.instrs = []
-        self.cur_routine = Routine(name, 'function', self,
+        self.cur_routine = Routine(orig_name, 'function', self,
                                    is_static=is_static)
         self.cur_routine.ret_type = ftype
 
@@ -2303,7 +2310,7 @@ class Compiler:
            self.is_function(base.children[0]):
             return None
         else:
-            var = self.get_var(base.children[0].value)
+            var = self.get_var(base.children[0].lower())
             if len(base.children) == 4:
                 _, _, indices, _ = base.children
                 indices = [Expr(i, self) for i in indices.children]
@@ -2612,6 +2619,7 @@ class Compiler:
 
 
     def is_function(self, name):
+        name = name.lower()
         ftype = self.get_type_from_var_name(name)
         if name[-1] in typespec_chars:
             name = name[:-1]
@@ -2691,7 +2699,7 @@ class Compiler:
 
         var = Var()
         var.used_name = used_name
-        var.name = name
+        var.name = name.lower()
         var.type = type
         var.container = container
         var.no_type_dimmed = no_type

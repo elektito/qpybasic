@@ -3406,6 +3406,66 @@ color 1.1!, 2.3#
     ]
 
 
+class TestCaseInsensitive1:
+    code = """
+foo% = 100
+print FOO%
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n'),
+    ]
+
+
+class TestCaseInsensitive2:
+    code = """
+declare sub FOO
+
+FOO
+
+sub Foo
+    print 100
+end sub
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 100 \n'),
+    ]
+
+
+class TestCaseInsensitive3:
+    code = """
+declare function FOO&(n&)
+
+print foo&(100)
+
+function Foo&(n&)
+    FoO& = n& + 1
+end function
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 101 \n'),
+    ]
+
+
+class TestCaseInsensitive4:
+    code = """
+dim foo as string
+
+FOO = "xyz"
+print Foo
+    """
+
+    cevents = []
+    vevents = [
+        ('print', 'xyz\n'),
+    ]
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     input_idx = 0
