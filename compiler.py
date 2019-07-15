@@ -1561,6 +1561,8 @@ class Compiler:
             _, routine_type, name = ast.children
             params = Tree('parameter_list', [])
 
+        routine_type = routine_type.lower()
+
         name = name.value
         if name[-1] in typespec_chars:
             if routine_type == 'sub':

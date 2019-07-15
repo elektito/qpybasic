@@ -2980,6 +2980,23 @@ loop while x < 5
     ]
 
 
+class TestRegression3:
+    # When the keyword SUB (or FUNCTION) was upper case, the declare
+    # did not work properly.
+
+    code = """
+DECLARE SUB foo
+
+foo
+
+SUB foo
+END SUB
+    """
+
+    cevents = []
+    vevents = []
+
+
 class TestSelect1:
     code = """
 n = 5
