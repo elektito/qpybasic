@@ -2889,6 +2889,8 @@ class Compiler:
 
 
     def get_default_type(self, var_name):
+        if var_name.startswith('__static_'):
+            var_name = var_name[var_name.rindex('_')+1:]
         t = self.default_types.get(var_name[0].lower(), None)
         t = t if t else Type('SINGLE')
         return deepcopy(t)
