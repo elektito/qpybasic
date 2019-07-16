@@ -2889,7 +2889,7 @@ class Compiler:
 
 
     def get_default_type(self, var_name):
-        t = self.default_types.get(var_name[-1], None)
+        t = self.default_types.get(var_name[0].lower(), None)
         t = t if t else Type('SINGLE')
         return deepcopy(t)
 

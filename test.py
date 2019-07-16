@@ -3024,6 +3024,24 @@ CONST FALSE = NOT TRUE
     vevents = []
 
 
+class TestRegression6:
+    # This used to give an "Invalid constant" error due to
+    # get_default_type not working properly.
+
+    code = """
+defint a-z
+CONST TRUE = -1
+CONST FALSE = NOT TRUE
+
+print true; false
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '-1  0 \n'),
+    ]
+
+
 class TestSelect1:
     code = """
 n = 5
