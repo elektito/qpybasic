@@ -10,7 +10,7 @@ from datetime import datetime
 from mmap import mmap
 from functools import reduce
 from enum import IntEnum, unique
-from compiler import Module
+from module import Module
 from malloc import Allocator, InvalidPointer
 from using import PrintUsingFormatter
 
