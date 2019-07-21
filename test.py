@@ -6,7 +6,8 @@ import unittest
 import sys
 import argparse
 import random
-from compiler import Compiler, CompileError, EC
+import struct
+from compiler import Compiler, CompileError, EC, DEFSEG_ADDR
 from vm import Machine, RE
 
 logger = logging.getLogger(__name__)
@@ -3511,6 +3512,19 @@ print Foo
     ]
 
 
+class TestDefSeg1:
+    code = """
+def seg = 1234
+    """
+
+    cevents = []
+    vevents = []
+
+    mem_checks = [
+        (DEFSEG_ADDR, 2, struct.pack('>H', 1234)),
+    ]
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     input_idx = 0
@@ -3546,9 +3560,16 @@ def run_test_case(name, case, optimization=0):
         machine = Machine.load(module)
         machine.event_handler = event_handler
         machine.launch()
-        machine.shutdown()
 
         tc.assertEqual(events, case.vevents)
+
+        if hasattr(case, 'mem_checks'):
+            for addr, size, expected_value in case.mem_checks:
+                machine.mem.seek(addr)
+                value = machine.mem.read(size)
+                tc.assertEqual(value, expected_value)
+
+        machine.shutdown()
 
 
 def get_all_tests():

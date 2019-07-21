@@ -13,6 +13,7 @@ from enum import IntEnum, unique
 from module import Module
 from malloc import Allocator, InvalidPointer
 from using import PrintUsingFormatter
+from compiler import DEFSEG_ADDR
 
 
 TRUE = struct.pack('>h', -1)
@@ -141,6 +142,9 @@ class Machine:
         self.event_handler = self.event_handler_routine
 
         self.allocator = Allocator([(self.HEAP_START, self.HEAP_SIZE)])
+
+        self.mem.seek(DEFSEG_ADDR)
+        self.mem.write(b'\x00\x00')
 
 
     def event_handler_routine(self, event):

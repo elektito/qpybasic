@@ -7,6 +7,8 @@ from lark import Lark, Token, Tree
 from module import Module
 
 
+DEFSEG_ADDR = 0x30000000
+
 typespec_chars = '%&!#$'
 
 typekw_to_typespec = {
@@ -1615,6 +1617,21 @@ class Compiler:
         else:
             dr = DeclaredRoutine(routine_type, orig_name, param_types, ret_type)
             self.declared_routines[name] = dr
+
+
+    def process_def_seg_stmt(self, ast):
+        if len(ast.children) == 3:
+            _, _, addr = ast.children
+            addr = Expr(addr, self)
+            if not addr.type.is_numeric:
+                raise CompileError(EC.TYPE_MISMATCH)
+            self.instrs += addr.instrs
+            self.instrs += gen_conv_instrs(addr.type, Type('%'))
+        else:
+            self.instrs += [Instr('pushi%', 0)]
+
+        self.instrs += [Instr('pushi_ul', DEFSEG_ADDR),
+                        Instr('writei2')]
 
 
     def process_deftype_stmt(self, ast):

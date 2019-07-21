@@ -23,6 +23,7 @@ lineno: NUMERIC_LITERAL
      | color_stmt
      | const_stmt
      | declare_stmt
+     | def_seg_stmt
      | deftype_stmt
      | dim_stmt
      | do_stmt
@@ -109,6 +110,8 @@ decl_param_list: "(" decl_param_def ("," decl_param_def)* ")"
                |
 
 decl_param_def: ID lpar_rpar [AS_KW (typename | ANY_KW)]
+
+def_seg_stmt: DEF_KW SEG_KW ["=" expr]
 
 deftype_stmt: (DEFINT_KW | DEFLNG_KW | DEFSNG_KW | DEFDBL_KW | DEFSTR_KW) letter_range ("," letter_range)*
 
@@ -255,6 +258,7 @@ CLS_KW: "cls"i
 COLOR_KW: "color"i
 CONST_KW: "const"i
 DECLARE_KW: "declare"i
+DEF_KW: "def"i
 DEFDBL_KW: "defdbl"i
 DEFINT_KW: "defint"i
 DEFLNG_KW: "deflng"i
@@ -287,6 +291,7 @@ OR_KW: "or"i
 PRINT_KW: "print"i
 RANDOMIZE_KW: "randomize"i
 RETURN_KW: "return"i
+SEG_KW: "seg"i
 SELECT_KW: "select"i
 SHARED_KW: "shared"i
 SINGLE_KW: "single"i
