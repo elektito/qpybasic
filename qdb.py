@@ -114,6 +114,71 @@ after call is reached.
         print(f'IP={ip:#0{10}x} SP={sp:#0{10}x} FP={fp:#0{10}x}')
 
 
+    def do_stack(self, arg):
+        """Print stack. The first argument is a type specifier and the second
+is the number of items to print.
+
+The type specifier is any of the QB type specifier characters (%&!#)
+or b (for byte).
+
+        """
+        args = arg.split()
+        if len(args) < 1:
+            print('Too few arguments.')
+            return
+        elif len(args) > 2:
+            print('Too many arguments.')
+            return
+
+        if len(args) == 2:
+            type, n = args
+            n = int(n)
+        else:
+            type, = args
+            n = 1
+
+        if type not in '%&!#b':
+            print(f'Invalid type specifier: {type}')
+
+        typelen = {
+            'b': 1,
+            '%': 2,
+            '&': 4,
+            '!': 4,
+            '#': 8,
+        }
+
+        addr = self.machine.sp
+        for i in range(n):
+            self.machine.mem.seek(addr)
+            value = self.machine.mem.read(typelen[type])
+
+            if type == 'b':
+                value = value[0]
+                desc = f'({value:#04x})'
+            elif type == '%':
+                value, = struct.unpack('>h', value)
+                desc = f'({value:#06x})'
+            elif type == '&':
+                value, = struct.unpack('>i', value)
+                desc = f'({value:#010x})'
+            elif type == '!':
+                value, = struct.unpack('>f', value)
+                desc = ''
+            elif type == '#':
+                value, = struct.unpack('>d', value)
+                desc = ''
+
+            if n > 1 and i == 0:
+                mark = '<-- top of the stack'
+            else:
+                mark = ''
+
+            print(f'{addr:08x}: {value} {desc} {mark}')
+
+            addr += typelen[type]
+
+
     def do_step(self, arg):
         "Execute one instruction."
         if self.machine.stopped:
