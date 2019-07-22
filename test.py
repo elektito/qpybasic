@@ -3525,6 +3525,33 @@ def seg = 1234
     ]
 
 
+class TestPokePeek1:
+    code = """
+def seg = 10000
+poke 100, 200
+    """
+
+    cevents = []
+    vevents = []
+
+    mem_checks = [
+        (0x27100064, 1, struct.pack('B', 200)),
+    ]
+
+
+class TestPokePeek2:
+    code = """
+def seg = 10000
+poke 100, 200
+print peek(100)
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 200 \n'),
+    ]
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     input_idx = 0

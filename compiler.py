@@ -92,6 +92,26 @@ def builtin_func_abs(parent, args):
     return e.type, instrs, e.is_const, const_value
 
 
+def builtin_func_peek(parent, args):
+    if len(args) != 1:
+        raise CompileError(EC.INVALID_FUNC_NARGS)
+
+    addr, = args
+    addr = Expr(addr, parent)
+    if not addr.type.is_numeric:
+        raise CompileError(EC.TYPE_MISMATCH)
+
+    instrs = [Instr('pushi_ul', DEFSEG_ADDR),
+              Instr('readi4'),
+              Instr('shl4', 16)]
+    instrs += addr.instrs
+    instrs += gen_conv_instrs(addr.type, Type('&'))
+    instrs += [Instr('or&'),
+               Instr('readi1'),
+               Instr('conv_b%')]
+    return Type('%'), instrs, False, 0
+
+
 def builtin_func_rnd(parent, args):
     if len(args) > 1:
         raise CompileError(EC.INVALID_FUNC_NARGS)
@@ -137,6 +157,7 @@ def parse_int_literal(value):
 
 builtin_functions = {
     'abs': builtin_func_abs,
+    'peek': builtin_func_peek,
     'rnd': builtin_func_rnd,
     'timer': builtin_func_timer,
 }
@@ -2344,6 +2365,29 @@ class Compiler:
                 raise CompileError(EC.TYPE_MISMATCH)
 
             return Lvalue(var, indices=indices, dots=dots, compiler=self)
+
+
+    def process_poke_stmt(self, ast):
+        _, addr, value = ast.children
+
+        addr = Expr(addr, self)
+        if not addr.type.is_numeric:
+            raise CompileError(EC.TYPE_MISMATCH)
+
+        value = Expr(value, self)
+        if not value.type.is_numeric:
+            raise CompileError(EC.TYPE_MISMATCH)
+
+        self.instrs += value.instrs
+        self.instrs += gen_conv_instrs(value.type, Type('%'))
+        self.instrs += [Instr('conv%_b'),
+                        Instr('pushi_ul', DEFSEG_ADDR),
+                        Instr('readi4'),
+                        Instr('shl4', 16)]
+        self.instrs += addr.instrs
+        self.instrs += gen_conv_instrs(addr.type, Type('&'))
+        self.instrs += [Instr('or&'),
+                        Instr('writei1')]
 
 
     def process_print_stmt(self, ast):

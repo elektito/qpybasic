@@ -306,6 +306,13 @@ class Machine:
         return Jump(target)
 
 
+    def exec_conv_b_integer(self):
+        value, = struct.unpack('>B', self.pop(1))
+        self.push(struct.pack('>h', value))
+        logger.debug('EXEC: conv_b%')
+        return 0
+
+
     def exec_conv_integer_long(self):
         value = self.pop(2)
         value, = struct.unpack('>h', value)
@@ -339,6 +346,17 @@ class Machine:
         value = struct.pack('>f', value)
         self.push(value)
         logger.debug('EXEC: conv%!')
+        return 0
+
+
+    def exec_conv_integer_b(self):
+        value = self.pop(2)
+        value, = struct.unpack('>h', value)
+        if value < 0 or value > 255:
+            value = 255
+        value = struct.pack('>B', value)
+        self.push(value)
+        logger.debug('EXEC: conv%_b')
         return 0
 
 
@@ -872,6 +890,15 @@ class Machine:
         return 4
 
 
+    def exec_readi1(self):
+        addr, = struct.unpack('>I', self.pop(4))
+        self.mem.seek(addr)
+        value = self.mem.read(1)
+        self.push(value)
+        logger.debug('EXEC: readi1')
+        return 0
+
+
     def exec_readi2(self):
         addr, = struct.unpack('>I', self.pop(4))
         self.mem.seek(addr)
@@ -971,6 +998,15 @@ class Machine:
             self.push(struct.pack('>h', -1))
         logger.debug('EXEC: sgn#')
         return 0
+
+
+    def exec_shl4(self):
+        shift, = struct.unpack('B', self.mem.read(1))
+        value, = struct.unpack('>I', self.pop(4))
+        value <<= shift
+        value &= 0xffffffff
+        self.push(struct.pack('>I', value))
+        return 1
 
 
     def exec_sub_integer(self):
@@ -1139,6 +1175,15 @@ class Machine:
         self.mem.write(value)
         logger.debug('EXEC: writef_n')
         return 4
+
+
+    def exec_writei1(self):
+        addr, = struct.unpack('>I', self.pop(4))
+        value = self.pop(1)
+        self.mem.seek(addr)
+        self.mem.write(value)
+        logger.debug(f'EXEC: writei1 from address {hex(addr)}. wrote value: {hex(struct.unpack(">B", value)[0])}')
+        return 0
 
 
     def exec_writei2(self):

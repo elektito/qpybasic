@@ -41,6 +41,7 @@ lineno: NUMERIC_LITERAL
      | let_stmt
      | loop_stmt
      | next_stmt
+     | poke_stmt
      | print_stmt
      | randomize_stmt
      | rem_stmt
@@ -154,6 +155,8 @@ input_stmt: INPUT_KW SEMICOLON? input_prompt_phrase lvalue ("," lvalue)*
 input_prompt_phrase: [STRING_LITERAL (SEMICOLON | COMMA)]
 
 let_stmt: LET_KW? lvalue "=" expr
+
+poke_stmt: POKE_KW expr "," expr
 
 print_stmt: PRINT_KW (expr _print_sep)* expr
           | PRINT_KW expr [_print_sep]
@@ -288,6 +291,7 @@ MOD_KW: "mod"i
 NEXT_KW: "next"i
 NOT_KW: "not"i
 OR_KW: "or"i
+POKE_KW: "poke"i
 PRINT_KW: "print"i
 RANDOMIZE_KW: "randomize"i
 RETURN_KW: "return"i

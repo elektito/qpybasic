@@ -15,6 +15,7 @@ class Operand:
         self.text_fmt = text_fmt
 
         self.size = {
+            'B': 1,
             'h': 2,
             'H': 2,
             'i': 4,
@@ -91,8 +92,11 @@ IMM_SINGLE = Operand('f', 'float')
 # A double-precision (64-bit) floating point immediate value.
 IMM_DOUBLE = Operand('d', 'float')
 
-# A unsigned, 32-bit long immediate value.
+# An unsigned, 32-bit long immediate value.
 IMM_UL = Operand('i', 'hex4')
+
+# An unsigned, 8-bite immediate value.
+IMM_UB = Operand('B', 'decimal')
 
 
 class Instruction:
@@ -319,6 +323,12 @@ def_instr(0x6a, 'mod&', stack=-4)
 def_instr(0x6b, 'mod!', stack=-4)
 def_instr(0x6c, 'mod#', stack=-8)
 def_instr(0x6d, 'dup8', stack=8)
+def_instr(0x6e, 'conv%_b', stack=-1)
+def_instr(0x6f, 'conv_b%', stack=1)
+def_instr(0x70, 'shl1', IMM_UB, stack=0)
+def_instr(0x71, 'shl2', IMM_UB, stack=0)
+def_instr(0x72, 'shl4', IMM_UB, stack=0)
+def_instr(0x73, 'shl8', IMM_UB, stack=0)
 
 # maximum instruction name length, calculated here for formatting
 # purposes.
