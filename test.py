@@ -3525,6 +3525,20 @@ def seg = 1234
     ]
 
 
+class TestDefSeg2:
+    code = """
+def seg = 1234
+def seg
+    """
+
+    cevents = []
+    vevents = []
+
+    mem_checks = [
+        (DEFSEG_ADDR, 4, struct.pack('>i', 0)),
+    ]
+
+
 class TestPokePeek1:
     code = """
 def seg = 10000
