@@ -1626,12 +1626,12 @@ class Compiler:
             if not addr.type.is_numeric:
                 raise CompileError(EC.TYPE_MISMATCH)
             self.instrs += addr.instrs
-            self.instrs += gen_conv_instrs(addr.type, Type('%'))
+            self.instrs += gen_conv_instrs(addr.type, Type('&'))
         else:
-            self.instrs += [Instr('pushi%', 0)]
+            self.instrs += [Instr('pushi&', 0)]
 
         self.instrs += [Instr('pushi_ul', DEFSEG_ADDR),
-                        Instr('writei2')]
+                        Instr('writei4')]
 
 
     def process_deftype_stmt(self, ast):

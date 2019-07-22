@@ -3521,7 +3521,7 @@ def seg = 1234
     vevents = []
 
     mem_checks = [
-        (DEFSEG_ADDR, 2, struct.pack('>H', 1234)),
+        (DEFSEG_ADDR, 4, struct.pack('>i', 1234)),
     ]
 
 
