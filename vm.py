@@ -488,6 +488,17 @@ class Machine:
         logger.debug('EXEC: div&')
         return 0
 
+    def exec_div_single(self):
+        y = self.pop(4)
+        x = self.pop(4)
+        y, = struct.unpack('>f', y)
+        x, = struct.unpack('>f', x)
+        result = x / y
+        result = struct.pack('>f', result)
+        self.push(result)
+        logger.debug('EXEC: div!')
+        return 0
+
 
     def exec_dup2(self):
         value = self.pop(2)
