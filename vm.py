@@ -1716,12 +1716,15 @@ class Machine:
         exit(1)
 
 
-    def shutdown(self):
+    def shutdown(self, interrupted=False):
         self.stopped = True
         self.mem.close()
 
-        assert self.allocator.alloced_slots == []
-        assert self.allocator.free_slots == [(self.HEAP_START, self.HEAP_SIZE)]
+        if not interrupted:
+            assert self.allocator.alloced_slots == []
+            assert self.allocator.free_slots == [
+                (self.HEAP_START, self.HEAP_SIZE)
+            ]
 
 
     @staticmethod
@@ -1784,8 +1787,14 @@ def main():
     })
 
     machine = Machine.load(args.module_file)
-    machine.launch()
-    machine.shutdown()
+    try:
+        machine.launch()
+    except KeyboardInterrupt:
+        print('\nStopped by keyboard interrupt')
+        interrupted = True
+    else:
+        interrupted = False
+    machine.shutdown(interrupted)
 
 
 if __name__ == '__main__':
