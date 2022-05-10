@@ -1535,6 +1535,28 @@ print x; y
     ]
 
 
+class TestVars12:
+    code = """
+print x$
+    """
+
+    cevents = []
+    vevents = [
+        ('print', '\n')
+    ]
+
+
+class TestVars13:
+    code = """
+print x%
+    """
+
+    cevents = []
+    vevents = [
+        ('print', ' 0 \n')
+    ]
+
+
 class TestArrayPass1:
     code = """
 sub foo(x() as integer, y)
