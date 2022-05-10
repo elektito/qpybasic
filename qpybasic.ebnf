@@ -17,7 +17,8 @@ label: ID ":"
 
 lineno: NUMERIC_LITERAL
 
-?stmt: call_stmt
+?stmt: beep_stmt
+     | call_stmt
      | case_stmt
      | cls_stmt
      | color_stmt
@@ -89,6 +90,8 @@ function_stmt: FUNCTION_KW ID parameter_list [STATIC_KW]
 // The reason this is more difficult than the other blocks is that it
 // doesn't contain normal statements.
 type_block: TYPE_KW ID _nl (parameter_definition COMMENT_QUOTE? _nl)* END_KW TYPE_KW
+
+beep_stmt: BEEP_KW
 
 call_stmt: lvalue argument_list
          | CALL_KW ID ["(" argument_list ")"]
@@ -255,6 +258,7 @@ STRING_LITERAL: /"[^"]*"/
 AND_KW: "and"i
 ANY_KW: "any"i
 AS_KW: "as"i
+BEEP_KW: "beep"i
 CALL_KW: "call"i
 CASE_KW: "case"i
 CLS_KW: "cls"i

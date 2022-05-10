@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import struct
 import logging
 import argparse
@@ -83,7 +84,9 @@ class MachineIo:
 
     def event_handler(self, event):
         event_name, *args = event
-        if event_name == 'cls':
+        if event_name == 'beep':
+            sys.stdout.write('\x07')
+        elif event_name == 'cls':
             seq =  '\033[2J'    # clear screen
             seq += '\033[1;1H'  # move cursor to screen top-left
             print(seq)
@@ -1098,6 +1101,7 @@ class Machine:
             0x12: self.syscall_seconds_since_midnight,
             0x13: self.syscall_rnd,
             0x14: self.syscall_randomize,
+            0x15: self.syscall_beep,
         }.get(value, None)
         if func == None:
             logger.error(f'Invalid syscall number: {value}')
@@ -1410,6 +1414,10 @@ class Machine:
     def syscall_randomize(self):
         seed, = struct.unpack('>i', self.pop(4))
         self.event_handler(('randomize', seed))
+
+
+    def syscall_beep(self):
+        self.event_handler(('beep',))
 
 
     def syscall_init_array(self):

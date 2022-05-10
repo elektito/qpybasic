@@ -1439,6 +1439,10 @@ class Compiler:
             self.compile_ast(i)
 
 
+    def process_beep_stmt(self, ast):
+        self.instrs += [Instr('syscall', '__beep')]
+
+
     def process_call_stmt(self, ast):
         if len(ast.children) == 2:
             if isinstance(ast.children[0], Token) and \
@@ -3082,6 +3086,7 @@ class Assembler:
                     '__seconds_since_midnight': 0x12,
                     '__rnd': 0x13,
                     '__randomize': 0x14,
+                    '__beep': 0x15,
                 }[instr.operands[0]]
                 operands = [call_code]
             else:
