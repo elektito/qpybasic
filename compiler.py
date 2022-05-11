@@ -904,14 +904,6 @@ class Expr:
         self.binary_logical_op('xor', left, right)
         self._instrs += [Instr(f'not{self.type.typespec}')]
 
-
-    def process_eqv_expr(self, ast):
-        left, _, right = ast.children
-        left = Expr(left, self.parent)
-        right = Expr(right, self.parent)
-        self.binary_logical_op('xor', left, right)
-        self._instrs += [Instr(f'not{self.type.typespec}')]
-
         # binary_logical_op has already done constant folding, but
         # here we change the value afterward, so we need to do it
         # again.
