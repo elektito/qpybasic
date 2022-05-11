@@ -483,6 +483,18 @@ end sub
     ]
 
 
+class TestSubInvalidName:
+    code = """
+sub foo%
+end sub
+    """
+
+    cevents = [
+        ('error', EC.INVALID_SUB_NAME)
+    ]
+    vevents = []
+
+
 class TestFunctionCall1:
     code = """
 function foo(x as string)
