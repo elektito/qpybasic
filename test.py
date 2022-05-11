@@ -3600,6 +3600,18 @@ print peek(100)
     ]
 
 
+class TestLabelKeywordConfusion:
+    code = """
+beep: cls
+    """
+
+    cevents = []
+    vevents = [
+        ('beep',),
+        ('cls',),
+    ]
+
+
 def run_test_case(name, case, optimization=0):
     events = []
     input_idx = 0
